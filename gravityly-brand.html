@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravityly — Identidade Visual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --base: #FAF7FF;
+    --ink: #211934;
+    --coral: #FF5D5D;
+    --violet: #6F5CFF;
+    --gold: #FFC857;
+    --dust: #C9C2E8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--base);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    padding: 48px 24px 80px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dust);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    margin: 56px 0 20px;
+  }
+
+  /* --- Logo lockup --- */
+  .stage {
+    border-radius: 24px;
+    padding: 56px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .stage.light { background: #FFFFFF; border: 1px solid #ECE7FA; }
+  .stage.dark { background: var(--ink); }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .wordmark {
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 800;
+    font-size: 44px;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: baseline;
+  }
+  .light .wordmark { color: var(--ink); }
+  .dark .wordmark { color: var(--base); }
+  .wordmark .g-planet { position: relative; display: inline-block; margin-right: 1px; }
+  .stagevariants { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .stagevariants { grid-template-columns: 1fr; } }
+
+  .icon-only .stage { padding: 40px; }
+
+  /* --- Palette --- */
+  .palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .swatch {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #ECE7FA;
+    background: #fff;
+  }
+  .swatch .fill { height: 72px; }
+  .swatch .label { padding: 10px 12px; }
+  .swatch .name { font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 700; }
+  .swatch .hex { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8A82A8; margin-top: 2px; }
+
+  /* --- Type sample --- */
+  .type-sample { background: #fff; border: 1px solid #ECE7FA; border-radius: 16px; padding: 24px; margin-bottom: 12px; }
+  .type-sample .tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--violet); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .display-sample { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 28px; }
+  .body-sample { font-family: 'Inter', sans-serif; font-size: 15px; color: #4A4360; line-height: 1.5; }
+  .mono-sample { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--coral); }
+
+  footer { margin-top: 64px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dust); text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Identidade visual</h1>
+  <div style="font-family: 'Baloo 2'; font-weight: 800; font-size: 32px;">gravityly</div>
+
+  <h2>Logo — fundo claro</h2>
+  <div class="stage light">
+    <div class="logo">
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <ellipse cx="26" cy="26" rx="24" ry="8" fill="none" stroke="#FF5D5D" stroke-width="3" transform="rotate(-18 26 26)"/>
+        <circle cx="26" cy="26" r="14" fill="#211934"/>
+        <circle cx="41" cy="17" r="3.5" fill="#FFC857"/>
+      </svg>
+      <div class="wordmark">gravityly</div>
+    </div>
+  </div>
+
+  <h2>Logo — fundo escuro</h2>
+  <div class="stage dark">
+    <div class="logo">
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <ellipse cx="26" cy="26" rx="24" ry="8" fill="none" stroke="#FF5D5D" stroke-width="3" transform="rotate(-18 26 26)"/>
+        <circle cx="26" cy="26" r="14" fill="#FAF7FF"/>
+        <circle cx="41" cy="17" r="3.5" fill="#FFC857"/>
+      </svg>
+      <div class="wordmark">gravityly</div>
+    </div>
+  </div>
+
+  <h2>Ícone isolado (favicon / app icon)</h2>
+  <div class="stagevariants icon-only">
+    <div class="stage light">
+      <svg width="80" height="80" viewBox="0 0 52 52">
+        <ellipse cx="26" cy="26" rx="24" ry="8" fill="none" stroke="#FF5D5D" stroke-width="3.5" transform="rotate(-18 26 26)"/>
+        <circle cx="26" cy="26" r="14" fill="#211934"/>
+        <circle cx="41" cy="17" r="4" fill="#FFC857"/>
+      </svg>
+    </div>
+    <div class="stage" style="background: linear-gradient(135deg, #6F5CFF, #211934);">
+      <svg width="80" height="80" viewBox="0 0 52 52">
+        <ellipse cx="26" cy="26" rx="24" ry="8" fill="none" stroke="#FFC857" stroke-width="3.5" transform="rotate(-18 26 26)"/>
+        <circle cx="26" cy="26" r="14" fill="#FAF7FF"/>
+        <circle cx="41" cy="17" r="4" fill="#FF5D5D"/>
+      </svg>
+    </div>
+  </div>
+
+  <h2>Paleta</h2>
+  <div class="palette">
+    <div class="swatch">
+      <div class="fill" style="background:#FAF7FF"></div>
+      <div class="label"><div class="name">Nebula White</div><div class="hex">#FAF7FF</div></div>
+    </div>
+    <div class="swatch">
+      <div class="fill" style="background:#211934"></div>
+      <div class="label"><div class="name">Deep Space</div><div class="hex">#211934</div></div>
+    </div>
+    <div class="swatch">
+      <div class="fill" style="background:#FF5D5D"></div>
+      <div class="label"><div class="name">Pull Coral</div><div class="hex">#FF5D5D</div></div>
+    </div>
+    <div class="swatch">
+      <div class="fill" style="background:#6F5CFF"></div>
+      <div class="label"><div class="name">Orbit Violet</div><div class="hex">#6F5CFF</div></div>
+    </div>
+    <div class="swatch">
+      <div class="fill" style="background:#FFC857"></div>
+      <div class="label"><div class="name">Spark Gold</div><div class="hex">#FFC857</div></div>
+    </div>
+    <div class="swatch">
+      <div class="fill" style="background:#C9C2E8"></div>
+      <div class="label"><div class="name">Dust Lavender</div><div class="hex">#C9C2E8</div></div>
+    </div>
+  </div>
+
+  <h2>Tipografia</h2>
+  <div class="type-sample">
+    <div class="tag">Display · Baloo 2</div>
+    <div class="display-sample">Seu momento, sua órbita.</div>
+  </div>
+  <div class="type-sample">
+    <div class="tag">Corpo · Inter</div>
+    <div class="body-sample">Usado em legendas, comentários e textos longos. Precisa ser legível em qualquer tamanho de tela, sem chamar atenção pra si mesma.</div>
+  </div>
+  <div class="type-sample">
+    <div class="tag">Utilitária · JetBrains Mono</div>
+    <div class="mono-sample">2h · 348 curtidas · @mateus</div>
+  </div>
+
+  <footer>gravityly — brand v1</footer>
+</div>
+</body>
+</html>

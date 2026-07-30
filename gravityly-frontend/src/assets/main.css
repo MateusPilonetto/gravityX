@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400..800&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
+
+:root {
+  --font-display: 'Baloo 2', sans-serif;
+  --font-body: 'Jost', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+.icon::before {
+  display: inline-block;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+body {
+  background-color: #211934;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+a {
+  text-decoration: none;
+  color: white;
+}
+
+a:hover {
+  color: #C9C2E8;
+}
+
+p, input, button, a {
+  font-family: var(--font-body);
+}
+
+.glass-effect {
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (hover: hover) {
+  
+}
+
+/* PARA TELAS MAIORES */
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    place-items: center;
+  }
+
+  #app {
+    max-width: 100%;
+    padding: 0;
+    width: 100%;
+    margin: 0;
+  }
+}

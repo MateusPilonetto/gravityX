@@ -1,0 +1,13 @@
+/vendor
+/node_modules
+/public/storage
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/views/
+/storage/logs/
+.env
+.env.testing
+.git
+.phpunit.cache
+.DS_Store
+database/database.sqlite
