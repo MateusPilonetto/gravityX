@@ -3,20 +3,25 @@
 namespace App\Services;
 
 use App\Models\User;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Sanctum\NewAccessToken;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
     public function register(array $data): array
     {
-        $user = User::create($data);
-        $token = $this->issueToken($user);
+        $user = User::create([
+            'name'     => $data['name'],
+            'username' => $data['username'],
+            'email'    => $data['email'],
+            'password' => Hash::make($data['password']),
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return [
             'user'  => $user,
-            'token' => $token->plainTextToken,
+            'token' => $token,
         ];
     }
 
@@ -24,21 +29,28 @@ class AuthService
     {
         $user = User::where('email', $credentials['email'])->first();
 
-        // one single message for "no such user" and "wrong password" on purpose
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            throw new AuthenticationException('Invalid credentials.');
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            // Isso gera um erro 422 automático com esta mensagem
+            throw ValidationException::withMessages([
+                'email' => ['These credentials do not match our records.'],
+            ]);
         }
 
-        $token = $this->issueToken($user);
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return [
             'user'  => $user,
-            'token' => $token->plainTextToken,
+            'token' => $token,
         ];
     }
 
-    private function issueToken(User $user): NewAccessToken
+    public function logout(User $user): void
     {
-        return $user->createToken('api-token');
+        /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+        $token = $user->currentAccessToken();
+
+        if ($token) {
+            $token->delete();
+        }
     }
 }
