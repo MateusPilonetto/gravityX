@@ -15,6 +15,7 @@ class UserSeeder extends Seeder
     {
         User::create([
             'name'     => 'Demo Reader',
+            'username' => 'demo_reader',
             'email'    => 'demo@bookshelf.test',
             'password' => 'secret123',
         ]);
