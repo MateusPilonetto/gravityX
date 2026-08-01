@@ -3,15 +3,42 @@ import { ref } from 'vue';
 
 const error = ref('');
 
-const fazerLogin = () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+const form = ref({
+  email: '',
+  password: ''
+});
 
-  if (email == "example@example" && password == "12345678") {
-    localStorage.setItem('usuario_logado', 'sim');
-    window.location.href = '/'; 
-  } else {
-    error.value = 'Error on login';
+const handleLogin = async () => {
+  error.value = ''; 
+
+  try {
+    const response = await fetch('http://localhost:8000/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(form.value)
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Saves the Sanctum auth token in the browser
+      localStorage.setItem('auth_token', data.data.token);
+      
+      // Redirects to the home page
+      window.location.href = '/'; 
+    } else {
+      // Displays Laravel validation errors or generic messages
+      if (data.errors) {
+        error.value = Object.values(data.errors)[0][0];
+      } else {
+        error.value = data.message || 'Invalid credentials.';
+      }
+    }
+  } catch (err) {
+    error.value = 'Failed to connect to the server.';
   }
 };
 </script>
@@ -24,20 +51,23 @@ const fazerLogin = () => {
         <h1 class="login-title">Gravityly</h1>
         <h1 class="login-subtitle">Sign-in</h1>
       </div>
-
-      <p class="error">{{ error }}</p>
-
-      <form @submit.prevent="fazerLogin" class="login-form">
+      
+      <p class="error" v-if="error">{{ error }}</p>
+      
+      <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <input type="email" id="email" placeholder="Your e-mail or username" required class="input-field" />
+          <!-- Using v-model instead of ID -->
+          <input type="email" v-model="form.email" placeholder="Your e-mail" required class="input-field" />
         </div>
         
         <div class="input-group">
-          <input type="password" id="password" placeholder="Your password" required class="input-field" />
+          <input type="password" v-model="form.password" placeholder="Your password" required class="input-field" />
           <a href="#">Forgot Password?</a>
         </div>
         
         <button type="submit" class="btn">Login</button>
+        
+        <!-- Vue Router Link to Register Page -->
         <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
           Create account
         </router-link>
@@ -49,8 +79,9 @@ const fazerLogin = () => {
 
 <style scoped>
 .error {
-  color: red;
+  color: #ff5d5d;
   text-align: center;
+  margin-bottom: 1rem;
 }
 
 .login-screen {
@@ -75,17 +106,17 @@ const fazerLogin = () => {
 
 .login-header {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .login-title {
-  color: #FFC857; 
+  color: #FFC857;
   margin: 0;
   font-size: 2.5rem;
 }
 
 .login-subtitle {
-  color: #C9C2E8; 
+  color: #C9C2E8;
   font-size: 1.5rem;
 }
 
@@ -109,7 +140,7 @@ const fazerLogin = () => {
 }
 
 .input-field:focus {
-  border-color: #6F5CFF; 
+  border-color: #6F5CFF;
 }
 
 .input-field::placeholder {
@@ -118,7 +149,7 @@ const fazerLogin = () => {
 
 .btn {
   margin-top: 0.3rem;
-  background-color: #6F5CFF; 
+  background-color: #6F5CFF;
   color: white;
   border: none;
   padding: 1rem;
@@ -131,11 +162,14 @@ const fazerLogin = () => {
 
 .register {
   text-align: center;
+  background-color: transparent;
+  border: 1px solid rgba(111, 92, 255, 0.3);
+  padding: 0.8rem;
 }
 
 .btn:hover {
   background-color: #C9C2E8;
   color: #211934;
-  transform: translateY(-2px); 
+  transform: translateY(-2px);
 }
 </style>

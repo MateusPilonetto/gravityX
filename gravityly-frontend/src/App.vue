@@ -1,21 +1,10 @@
 <script setup>
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 
-import { ref, onMounted, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router'; 
-
-const route = useRoute(); 
-const router = useRouter();
+const route = useRoute();
 
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
-
-onMounted(() => {
-  const temChave = localStorage.getItem('usuario_logado');
-
-  if (!temChave && route.path !== '/login') {
-    router.push('/login'); 
-  }
-});
-
 </script>
 
 <template>

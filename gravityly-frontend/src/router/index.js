@@ -17,7 +17,7 @@ const routes = [
   {
     path: '/register',
     name: 'register',
-    component: RegisterView 
+    component: RegisterView
   }
 ]
 
@@ -25,5 +25,18 @@ const router = createRouter({
   history: createWebHistory(),
   routes
 })
+
+router.beforeEach((to, from, next) => {
+  const hasToken = localStorage.getItem('auth_token');
+  const isAuthPage = ['/login', '/register'].includes(to.path);
+
+  if (!hasToken && !isAuthPage) {
+    next('/login');
+  } else if (hasToken && isAuthPage) {
+    next('/');
+  } else {
+    next();
+  }
+});
 
 export default router
