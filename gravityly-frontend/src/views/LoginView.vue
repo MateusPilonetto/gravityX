@@ -38,7 +38,9 @@ const fazerLogin = () => {
         </div>
         
         <button type="submit" class="btn">Login</button>
-        <a type="submit" class="btn register">Create account</a>
+        <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
+          Create account
+        </router-link>
       </form>
       
     </div>

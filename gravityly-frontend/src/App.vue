@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router';
 const route = useRoute(); 
 const router = useRouter();
 
-const isLoginPage = computed(() => route.path === '/login');
+const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 
 onMounted(() => {
   const temChave = localStorage.getItem('usuario_logado');
@@ -19,7 +19,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <header v-if="!isLoginPage">
+    <header v-if="!isAuthPage">
       <div class="logo-items">
         <img alt="Gravityly logo" class="logo" src="./assets/gravityly-logo-light.svg" width="125" height="125" />
         <h1 class="logo-title">Gravityly</h1>
@@ -34,7 +34,7 @@ onMounted(() => {
       <router-view />
     </main>
 
-     <div class="bottom-nav-wrapper" v-if="!isLoginPage">     
+     <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
         <nav class="bottom-nav">       
           <i class="fa-solid fa-house nav-icon active"></i>        
           <i class="fa-solid fa-magnifying-glass nav-icon"></i>        
