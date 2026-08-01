@@ -25,12 +25,30 @@ const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 
      <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
         <nav class="bottom-nav">       
-          <i class="fa-solid fa-house nav-icon active"></i>        
-          <i class="fa-solid fa-magnifying-glass nav-icon"></i>        
-          <i class="fa-solid fa-square-plus nav-icon"></i>        
-          <i class="fa-solid fa-message nav-icon"></i>        
+          <!-- Home Link -->
+          <router-link to="/" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-house nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>
+
+          <!-- Search Link (Ajuste a rota se necessário, ex: /search) -->
+          <router-link to="/search" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-magnifying-glass nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
           
-          <img class="nav-profile-pic" loading="lazy" src="https://images.pexels.com/photos/30372403/pexels-photo-30372403.jpeg?auto=compress&cs=tinysrgb&w=400" alt="Profile photo">     
+          <!-- Create Post Link (Ajuste a rota se necessário, ex: /post/create) -->
+          <router-link to="/post/create" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-square-plus nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
+          
+          <!-- Messages Link (Ajuste a rota se necessário, ex: /messages) -->
+          <router-link to="/messages" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
+          
+          <!-- Profile Link -->
+          <router-link to="/profile">
+            <img class="nav-profile-pic" loading="lazy" src="https://images.pexels.com/photos/30372403/pexels-photo-30372403.jpeg?auto=compress&cs=tinysrgb&w=400" alt="Profile photo">
+          </router-link>    
         </nav>   
       </div>
 </template>
