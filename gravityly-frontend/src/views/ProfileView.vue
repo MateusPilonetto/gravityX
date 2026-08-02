@@ -8,11 +8,16 @@ const loading = ref(true);
 const errorMessage = ref(''); 
 const router = useRouter();
 
-// Generates a nice avatar based on the user's initial
 const avatarUrl = computed(() => {
-  if (user.value && user.value.profile_photo_url) {
-    return user.value.profile_photo_url;
+  let url = user.value?.profile_photo_url;
+  
+  if (url) {
+    const match = url.match(/avatars\/([^/]+)$/);
+    if (match) {
+      return `http://localhost:8000/storage/avatars/${match[1]}`;
+    }
   }
+  
   const name = user.value?.name ? encodeURIComponent(user.value.name) : 'User';
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
 });
@@ -56,28 +61,25 @@ const handleLogout = () => {
     
     <div v-else-if="user" class="gravityly-layout">
       
-      <!-- PROFILE HEADER -->
+
       <header class="profile-header">
         <div class="profile-avatar-container">
           <img class="profile-avatar" :src="avatarUrl" alt="User avatar">
         </div>
 
         <section class="profile-info">
-          <!-- Line 1 -->
           <div class="info-top">
             <h2 class="username">{{ user.username || 'username' }}</h2>
             <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
             <router-link to="/profile/edit" class="settings-icon"><i class="fa-solid fa-gear"></i></router-link>
           </div>
 
-          <!-- Line 2 -->
           <ul class="info-stats">
             <li><span class="stat-count">{{ user.posts_count || 0 }}</span> posts</li>
             <li><span class="stat-count">{{ user.followers_count || 0 }}</span> followers</li>
             <li><span class="stat-count">{{ user.following_count || 0 }}</span> following</li>
           </ul>
 
-          <!-- Line 3 -->
           <div class="info-bio">
             <h1 class="fullname">{{ user.name || 'User' }}</h1>
             <div class="bio-text">
@@ -87,13 +89,10 @@ const handleLogout = () => {
         </section>
       </header>
 
-      <!-- TABS -->
       <div class="profile-tabs">
         <a href="#" class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</a>
-        <a href="#" class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</a>
       </div>
 
-      <!-- POSTS GRID -->
       <div class="posts-grid">
         <div class="empty-posts">
           <i class="fa-solid fa-camera fa-2xl"></i>

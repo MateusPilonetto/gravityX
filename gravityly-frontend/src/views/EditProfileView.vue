@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { api, getToken } from '../services/api';
+import { userStore } from '../store'; 
 
 const router = useRouter();
 const error = ref('');
@@ -16,46 +16,54 @@ const form = ref({
   name: '',
   username: '',
   bio: '',
-  profile_photo_url: '' // Holds the current photo URL, if any
+  profile_photo_url: ''
 });
 
-// Picks which avatar to display: local preview > saved photo > generated placeholder
 const displayAvatar = computed(() => {
   if (previewUrl.value) return previewUrl.value;
-  if (form.value.profile_photo_url) return form.value.profile_photo_url;
   
-  const name = form.value.name ? encodeURIComponent(form.value.name) : 'U';
+  let url = form.value?.profile_photo_url;
+  
+  if (url) {
+    const match = url.match(/avatars\/([^/]+)$/);
+    if (match) {
+      return `http://localhost:8000/storage/avatars/${match[1]}`;
+    }
+  }
+  
+  const name = form.value?.name ? encodeURIComponent(form.value.name) : 'U';
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
 });
 
 onMounted(async () => {
-  if (!getToken()) {
-    router.push('/login');
-    return;
-  }
-
+  const token = localStorage.getItem('auth_token');
   try {
-    const { data } = await api.get('/me');
-    form.value.name = data.name;
-    form.value.username = data.username;
-    form.value.bio = data.bio || '';
-    form.value.profile_photo_url = data.profile_photo_url || '';
+    const response = await fetch('http://localhost:8000/api/me', {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const userData = data.data ? data.data : data;
+      form.value.name = userData.name;
+      form.value.username = userData.username;
+      form.value.bio = userData.bio || '';
+      form.value.profile_photo_url = userData.profile_photo_url || '';
+    }
   } catch (err) {
-    error.value = err.message;
+    console.error(err);
   }
 });
 
-// Opens the hidden file input
 const triggerFileInput = () => {
   fileInput.value.click();
 };
 
-// Runs when the user picks an image from their device
 const onFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
     selectedFile.value = file;
-    previewUrl.value = URL.createObjectURL(file); // Temporary local URL just for the preview
+    previewUrl.value = URL.createObjectURL(file);
   }
 };
 
@@ -63,23 +71,46 @@ const handleSave = async () => {
   error.value = '';
   successMessage.value = '';
   loading.value = true;
+  const token = localStorage.getItem('auth_token');
 
-  // FormData instead of JSON so the image can be sent in the same request
   const formData = new FormData();
+  formData.append('_method', 'PUT');
   formData.append('name', form.value.name);
   formData.append('username', form.value.username);
   formData.append('bio', form.value.bio || '');
-
+  
   if (selectedFile.value) {
-    formData.append('avatar', selectedFile.value); // Field name must match what the backend expects
+    formData.append('avatar', selectedFile.value);
   }
 
   try {
-    await api.put('/me', formData);
-    successMessage.value = 'Profile updated successfully!';
-    setTimeout(() => router.push('/profile'), 1500);
+    const response = await fetch('http://localhost:8000/api/me', {
+      method: 'POST', 
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      body: formData
+    });
+
+    let data;
+    try {
+        data = await response.json();
+    } catch (parseError) {
+        throw new Error("O backend não devolveu um JSON. O servidor pode estar fora do ar.");
+    }
+
+    if (response.ok) {
+      userStore.setCurrentUser(data.data); 
+      
+      successMessage.value = 'Profile updated successfully!';
+      setTimeout(() => router.push('/profile'), 1500);
+    } else {
+      error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
+    }
   } catch (err) {
-    error.value = err.firstMessage ? err.firstMessage() : err.message;
+    console.error("Error", err);
+    error.value = 'Error ' + err.message;
   } finally {
     loading.value = false;
   }
@@ -95,10 +126,9 @@ const handleSave = async () => {
           <i class="fa-solid fa-chevron-left"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>
-        <div style="width: 65px;"></div> <!-- Spacer to keep the title centered -->
+        <div style="width: 65px;"></div> 
       </div>
 
-      <!-- Interactive Avatar -->
       <div class="avatar-section">
         <div class="avatar-wrapper" @click="triggerFileInput">
           <img class="avatar-preview" :src="displayAvatar" alt="Profile Avatar" />
@@ -106,7 +136,6 @@ const handleSave = async () => {
             <i class="fa-solid fa-camera"></i>
           </div>
         </div>
-        <!-- Hidden file input -->
         <input 
           type="file" 
           ref="fileInput" 
