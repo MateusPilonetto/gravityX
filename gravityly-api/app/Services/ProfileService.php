@@ -15,14 +15,9 @@ class ProfileService
             $data['profile_photo_url'] = $this->storeAvatar($avatar);
         }
 
-        $user->update([
-            'name'     => $data['name'],
-            'username' => $data['username'],
-            'bio'      => $data['bio'] ?? null,
-            ...(isset($data['profile_photo_url']) ? ['profile_photo_url' => $data['profile_photo_url']] : []),
-        ]);
+        $user->update($data);
 
-        return $user->fresh();
+        return $user;
     }
 
     private function storeAvatar(UploadedFile $avatar): string
