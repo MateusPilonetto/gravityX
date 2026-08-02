@@ -51,20 +51,32 @@ class AuthController extends Controller
     }
 
     public function updateProfile(Request $request): JsonResponse
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
-            'bio'      => ['nullable', 'string', 'max:1000'],
-        ]);
+    $validated = $request->validate([
+        'name'     => ['required', 'string', 'max:255'],
+        'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
+        'bio'      => ['nullable', 'string', 'max:1000'],
+        'avatar'   => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
+    ]);
 
-        $user->update($validated);
+    $user->update([
+        'name'     => $validated['name'],
+        'username' => $validated['username'],
+        'bio'      => $validated['bio'] ?? null,
+    ]);
 
-        return response()->json([
-            'message' => 'Profile updated successfully',
-            'data'    => $user
-        ], 200);
+    if ($request->hasFile('avatar')) {
+        $path = $request->file('avatar')->store('avatars', 'public');
+        
+        $user->profile_photo_url = url('storage/' . $path);
+        $user->save();
     }
+
+    return response()->json([
+        'message' => 'Profile updated successfully',
+        'data'    => $user
+    ], 200);
+}
 }

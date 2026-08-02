@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -7,10 +7,24 @@ const error = ref('');
 const successMessage = ref('');
 const loading = ref(false);
 
+const fileInput = ref(null);
+const selectedFile = ref(null);
+const previewUrl = ref(null);
+
 const form = ref({
   name: '',
   username: '',
-  bio: ''
+  bio: '',
+  profile_photo_url: '' // Guarda a URL da foto atual (se houver)
+});
+
+// Calcula qual avatar mostrar: Pré-visualização local > Foto do Banco > Avatar Gerado
+const displayAvatar = computed(() => {
+  if (previewUrl.value) return previewUrl.value;
+  if (form.value.profile_photo_url) return form.value.profile_photo_url;
+  
+  const name = form.value.name ? encodeURIComponent(form.value.name) : 'U';
+  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
 });
 
 onMounted(async () => {
@@ -26,11 +40,26 @@ onMounted(async () => {
       form.value.name = userData.name;
       form.value.username = userData.username;
       form.value.bio = userData.bio || '';
+      form.value.profile_photo_url = userData.profile_photo_url || '';
     }
   } catch (err) {
     console.error(err);
   }
 });
+
+// Aciona o clique no input hidden de arquivo
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+// Quando o usuário escolhe uma imagem no PC/Celular
+const onFileChange = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    selectedFile.value = file;
+    previewUrl.value = URL.createObjectURL(file); // Cria a URL temporária para mostrar na tela
+  }
+};
 
 const handleSave = async () => {
   error.value = '';
@@ -38,93 +67,114 @@ const handleSave = async () => {
   loading.value = true;
   const token = localStorage.getItem('auth_token');
 
+  // Usamos FormData em vez de JSON para suportar o envio da imagem
+  const formData = new FormData();
+  formData.append('_method', 'PUT'); // Truque do Laravel para aceitar arquivos na atualização
+  formData.append('name', form.value.name);
+  formData.append('username', form.value.username);
+  formData.append('bio', form.value.bio || '');
+  
+  if (selectedFile.value) {
+    formData.append('avatar', selectedFile.value); // O nome 'avatar' deve bater com o esperado no backend
+  }
+
   try {
+    // Atenção: A requisição virou POST por causa do FormData (mas o Laravel vai ler como PUT devido ao _method)
     const response = await fetch('http://localhost:8000/api/me', {
-      method: 'PUT',
+      method: 'POST', 
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
         'Accept': 'application/json'
+        // O Content-Type não é definido aqui, o navegador cria automaticamente com o "boundary" do FormData
       },
-      body: JSON.stringify(form.value)
+      body: formData
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      successMessage.value = 'Perfil salvo com sucesso!';
-      setTimeout(() => router.push('/profile'), 1000);
+      successMessage.value = 'Profile updated successfully!';
+      setTimeout(() => router.push('/profile'), 1500);
     } else {
       error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
     }
   } catch (err) {
-    error.value = 'Erro ao conectar ao servidor.';
+    error.value = 'Failed to connect to the server.';
   } finally {
     loading.value = false;
   }
-};
-
-const handleLogout = async () => {
-  const token = localStorage.getItem('auth_token');
-  await fetch('http://localhost:8000/api/logout', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-  });
-  localStorage.removeItem('auth_token');
-  router.push('/login');
 };
 </script>
 
 <template>
   <div class="edit-container">
-    <div class="edit-box">
+    <div class="glass-panel">
+      
       <div class="edit-header">
-        <router-link to="/profile" class="back-link"><i class="fa-solid fa-chevron-left"></i></router-link>
-        <h2>Editar perfil</h2>
-        <div style="width: 20px;"></div>
+        <router-link to="/profile" class="back-btn">
+          <i class="fa-solid fa-chevron-left"></i> Cancel
+        </router-link>
+        <h2>Edit Profile</h2>
+        <div style="width: 65px;"></div> <!-- Espaçador para manter o título no centro -->
       </div>
 
-      <!-- Simulador de mudança de foto -->
-      <div class="change-photo-section">
-        <img class="avatar-preview" src="https://images.pexels.com/photos/30372403/pexels-photo-30372403.jpeg?auto=compress&cs=tinysrgb&w=400" />
-        <div class="photo-info">
-          <h3>{{ form.username }}</h3>
-          <button type="button" class="change-photo-btn">Alterar foto do perfil</button>
+      <!-- Avatar Interativo -->
+      <div class="avatar-section">
+        <div class="avatar-wrapper" @click="triggerFileInput">
+          <img class="avatar-preview" :src="displayAvatar" alt="Profile Avatar" />
+          <div class="avatar-overlay">
+            <i class="fa-solid fa-camera"></i>
+          </div>
         </div>
+        <!-- Input invisível -->
+        <input 
+          type="file" 
+          ref="fileInput" 
+          hidden 
+          @change="onFileChange" 
+          accept="image/png, image/jpeg, image/jpg" 
+        />
+        <button type="button" class="change-photo-btn" @click="triggerFileInput">
+          Change Profile Photo
+        </button>
       </div>
 
-      <!-- Formulário -->
+      <!-- Formulário Moderno -->
       <form @submit.prevent="handleSave" class="form-body">
-        <p class="error-msg" v-if="error">{{ error }}</p>
-        <p class="success-msg" v-if="successMessage">{{ successMessage }}</p>
+        
+        <transition name="fade">
+          <div class="alert-box error" v-if="error">
+            <i class="fa-solid fa-circle-exclamation"></i> {{ error }}
+          </div>
+        </transition>
+
+        <transition name="fade">
+          <div class="alert-box success" v-if="successMessage">
+            <i class="fa-solid fa-circle-check"></i> {{ successMessage }}
+          </div>
+        </transition>
 
         <div class="form-group">
-          <label>Nome</label>
-          <input type="text" v-model="form.name" required placeholder="Nome completo" />
-          <span class="hint">Ajude as pessoas a descobrirem sua conta usando o nome pelo qual você é conhecido.</span>
+          <label>Name</label>
+          <input type="text" v-model="form.name" required placeholder="Your full name" class="glass-input" />
         </div>
         
         <div class="form-group">
-          <label>Nome de usuário</label>
-          <input type="text" v-model="form.username" required placeholder="Nome de usuário" />
+          <label>Username</label>
+          <input type="text" v-model="form.username" required placeholder="Choose a username" class="glass-input" />
         </div>
         
         <div class="form-group">
-          <label>Biografia</label>
-          <!-- Textarea alto para suportar quebras de linha igual ao Instagram -->
-          <textarea v-model="form.bio" rows="5" placeholder="Escreva sobre você..."></textarea>
+          <label>Bio</label>
+          <textarea v-model="form.bio" rows="4" placeholder="Write something about yourself..." class="glass-input"></textarea>
         </div>
 
-        <button type="submit" class="btn-submit" :disabled="loading">
-          {{ loading ? 'Salvando...' : 'Enviar' }}
+        <button type="submit" class="btn-submit glow-effect" :disabled="loading">
+          <i class="fa-solid fa-spinner fa-spin" v-if="loading"></i> 
+          <span v-else>Save Changes</span>
         </button>
       </form>
-      
-      <!-- Linha separadora -->
-      <hr class="divider" />
-      
-      <!-- Logout -->
-      <button @click="handleLogout" class="btn-logout">Sair da conta</button>
+
     </div>
   </div>
 </template>
@@ -133,67 +183,121 @@ const handleLogout = async () => {
 .edit-container {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
   padding: 40px 20px 100px 20px;
   color: #fff;
 }
 
-.edit-box {
+/* Painel de Vidro (Glassmorphism) */
+.glass-panel {
   width: 100%;
-  max-width: 600px;
-  background-color: transparent;
+  max-width: 500px;
+  background: rgba(33, 25, 52, 0.7);
+  border: 1px solid rgba(111, 92, 255, 0.3);
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+/* Cabeçalho */
 .edit-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 40px;
 }
 
 .edit-header h2 {
-  font-size: 1.2rem;
-  font-weight: bold;
+  font-size: 1.3rem;
+  font-weight: 600;
   margin: 0;
+  color: #FFC857;
 }
 
-.back-link {
-  color: #fff;
-  font-size: 1.2rem;
+.back-btn {
+  color: #C9C2E8;
+  font-size: 1rem;
   text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
 }
 
-.change-photo-section {
+.back-btn:hover {
+  color: #fff;
+}
+
+/* Seção do Avatar */
+.avatar-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  background-color: #262626;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 35px;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: hidden;
+  border: 3px solid #6F5CFF;
+  box-shadow: 0 4px 15px rgba(111, 92, 255, 0.4);
+  transition: transform 0.3s ease;
+}
+
+.avatar-wrapper:hover {
+  transform: scale(1.05);
 }
 
 .avatar-preview {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  margin-right: 15px;
 }
 
-.photo-info h3 {
-  margin: 0 0 5px 0;
-  font-size: 1rem;
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.avatar-wrapper:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-overlay i {
+  color: white;
+  font-size: 1.5rem;
 }
 
 .change-photo-btn {
   background: none;
   border: none;
-  color: #0095f6; /* Azul clássico do Instagram */
-  font-weight: bold;
-  padding: 0;
+  color: #6F5CFF;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-top: 12px;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: color 0.3s;
 }
 
+.change-photo-btn:hover {
+  color: #FFC857;
+}
+
+/* Formulário */
 .form-body {
   display: flex;
   flex-direction: column;
@@ -206,80 +310,87 @@ const handleLogout = async () => {
 }
 
 .form-group label {
-  font-weight: bold;
+  font-weight: 500;
   margin-bottom: 8px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  color: #C9C2E8;
 }
 
-.form-group input,
-.form-group textarea {
-  background-color: #121212;
-  border: 1px solid #363636;
+/* Inputs com estilo Glass */
+.glass-input {
+  background-color: rgba(20, 15, 35, 0.5);
+  border: 1px solid rgba(111, 92, 255, 0.2);
   color: #fff;
-  border-radius: 6px;
-  padding: 10px 15px;
+  border-radius: 12px;
+  padding: 14px 16px;
   font-size: 1rem;
   outline: none;
-  transition: border 0.2s;
+  transition: all 0.3s ease;
   resize: vertical;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
-  border-color: #555;
+.glass-input:focus {
+  border-color: #6F5CFF;
+  background-color: rgba(20, 15, 35, 0.8);
+  box-shadow: 0 0 0 3px rgba(111, 92, 255, 0.2);
 }
 
-.hint {
-  font-size: 0.75rem;
-  color: #a8a8a8;
-  margin-top: 6px;
+.glass-input::placeholder {
+  color: rgba(201, 194, 232, 0.4);
 }
 
+/* Botão de Salvar */
 .btn-submit {
-  background-color: #0095f6;
+  background-color: #6F5CFF;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 1.05rem;
   cursor: pointer;
   margin-top: 10px;
+  transition: all 0.3s ease;
 }
 
 .btn-submit:disabled {
   opacity: 0.7;
+  cursor: not-allowed;
 }
 
-.divider {
-  border: none;
-  border-top: 1px solid #363636;
-  margin: 30px 0;
+.glow-effect:hover:not(:disabled) {
+  background-color: #FFC857;
+  color: #211934;
+  box-shadow: 0 0 15px rgba(255, 200, 87, 0.4);
 }
 
-.btn-logout {
-  width: 100%;
-  background: transparent;
-  color: #ff5d5d;
-  border: 1px solid #ff5d5d;
+/* Alertas Animados */
+.alert-box {
+  padding: 12px 16px;
   border-radius: 8px;
-  padding: 12px;
-  font-weight: bold;
-  font-size: 1rem;
-  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.btn-logout:hover {
+.alert-box.error {
   background: rgba(255, 93, 93, 0.1);
-}
-
-.error-msg {
+  border: 1px solid rgba(255, 93, 93, 0.3);
   color: #ff5d5d;
-  margin: 0;
 }
 
-.success-msg {
+.alert-box.success {
+  background: rgba(76, 217, 100, 0.1);
+  border: 1px solid rgba(76, 217, 100, 0.3);
   color: #4cd964;
-  margin: 0;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

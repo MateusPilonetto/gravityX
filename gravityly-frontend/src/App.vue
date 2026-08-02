@@ -1,10 +1,40 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
-
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
+const user = ref(null);
+
+// Lógica para pegar o avatar inteligente para a navbar
+const navAvatarUrl = computed(() => {
+  if (user.value && user.value.profile_photo_url) {
+    return user.value.profile_photo_url;
+  }
+  const name = user.value?.name ? encodeURIComponent(user.value.name) : 'U';
+  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
+});
+
+// Puxa o nome de usuário apenas para montar o avatar na navbar
+onMounted(async () => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    try {
+      const response = await fetch('http://localhost:8000/api/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        user.value = data.data || data.user || data;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+});
 </script>
 
 <template>
@@ -25,29 +55,25 @@ const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 
      <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
         <nav class="bottom-nav">       
-          <!-- Home Link -->
           <router-link to="/" custom v-slot="{ navigate, isActive }">
             <i class="fa-solid fa-house nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>
 
-          <!-- Search Link (Ajuste a rota se necessário, ex: /search) -->
           <router-link to="/search" custom v-slot="{ navigate, isActive }">
             <i class="fa-solid fa-magnifying-glass nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <!-- Create Post Link (Ajuste a rota se necessário, ex: /post/create) -->
           <router-link to="/post/create" custom v-slot="{ navigate, isActive }">
             <i class="fa-solid fa-square-plus nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <!-- Messages Link (Ajuste a rota se necessário, ex: /messages) -->
           <router-link to="/messages" custom v-slot="{ navigate, isActive }">
             <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <!-- Profile Link -->
+          <!-- Avatar da Navbar Dinâmico -->
           <router-link to="/profile">
-            <img class="nav-profile-pic" loading="lazy" src="https://images.pexels.com/photos/30372403/pexels-photo-30372403.jpeg?auto=compress&cs=tinysrgb&w=400" alt="Profile photo">
+            <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
           </router-link>    
         </nav>   
       </div>
@@ -156,8 +182,8 @@ header {
 }
 
 .nav-profile-pic {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.2rem;
+  height: 2.2rem;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #FFC857;
