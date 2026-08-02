@@ -1,9 +1,11 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { api, setToken } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
+const loading = ref(false);
 
 const form = ref({
   name: '',
@@ -13,34 +15,18 @@ const form = ref({
   password_confirmation: ''
 });
 
-const fazerCadastro = async () => {
-  error.value = ''; 
+const handleRegister = async () => {
+  error.value = '';
+  loading.value = true;
 
   try {
-    const response = await fetch('http://localhost:8000/api/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(form.value)
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      localStorage.setItem('auth_token', data.data.token);
-      
-      window.location.href = '/'; 
-    } else {
-      if (data.errors) {
-        error.value = Object.values(data.errors)[0][0];
-      } else {
-        error.value = data.message || 'Error creating account.';
-      }
-    }
+    const { data } = await api.post('/register', form.value, { auth: false });
+    setToken(data.token);
+    router.push('/');
   } catch (err) {
-    error.value = 'Failed to connect to the server.';
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
+  } finally {
+    loading.value = false;
   }
 };
 </script>
@@ -56,7 +42,7 @@ const fazerCadastro = async () => {
       
       <p class="error" v-if="error">{{ error }}</p>
       
-      <form @submit.prevent="fazerCadastro" class="login-form">
+      <form @submit.prevent="handleRegister" class="login-form">
         <div class="input-group">
           <input type="text" v-model="form.name" placeholder="Full Name" required class="input-field" />
         </div>
@@ -77,9 +63,11 @@ const fazerCadastro = async () => {
           <input type="password" v-model="form.password_confirmation" placeholder="Confirm Password" required class="input-field" minlength="8" />
         </div>
         
-        <button type="submit" class="btn">Register</button>
+        <button type="submit" class="btn" :disabled="loading">
+          {{ loading ? 'Creating account...' : 'Register' }}
+        </button>
         
-        <!-- Link para voltar ao Login -->
+        <!-- Link back to Login -->
         <router-link to="/login" class="btn register" style="text-decoration: none;">
           Already have an account?
         </router-link>
@@ -102,5 +90,6 @@ const fazerCadastro = async () => {
 .input-field::placeholder { color: rgba(201, 194, 232, 0.6); }
 .btn { background-color: #6F5CFF; color: white; border: none; padding: 1rem; border-radius: 1rem; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease; text-align: center; }
 .btn:hover { background-color: #C9C2E8; color: #211934; transform: translateY(-2px); }
+.btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 .register { background-color: transparent; border: 1px solid rgba(111, 92, 255, 0.3); font-size: 1rem; padding: 0.8rem; }
 </style>

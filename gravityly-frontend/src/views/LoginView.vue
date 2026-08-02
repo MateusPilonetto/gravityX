@@ -1,7 +1,11 @@
 <script setup>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { api, setToken } from '../services/api';
 
+const router = useRouter();
 const error = ref('');
+const loading = ref(false);
 
 const form = ref({
   email: '',
@@ -9,36 +13,17 @@ const form = ref({
 });
 
 const handleLogin = async () => {
-  error.value = ''; 
+  error.value = '';
+  loading.value = true;
 
   try {
-    const response = await fetch('http://localhost:8000/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(form.value)
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Saves the Sanctum auth token in the browser
-      localStorage.setItem('auth_token', data.data.token);
-      
-      // Redirects to the home page
-      window.location.href = '/'; 
-    } else {
-      // Displays Laravel validation errors or generic messages
-      if (data.errors) {
-        error.value = Object.values(data.errors)[0][0];
-      } else {
-        error.value = data.message || 'Invalid credentials.';
-      }
-    }
+    const { data } = await api.post('/login', form.value, { auth: false });
+    setToken(data.token);
+    router.push('/');
   } catch (err) {
-    error.value = 'Failed to connect to the server.';
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
+  } finally {
+    loading.value = false;
   }
 };
 </script>
@@ -65,7 +50,9 @@ const handleLogin = async () => {
           <a href="#">Forgot Password?</a>
         </div>
         
-        <button type="submit" class="btn">Login</button>
+        <button type="submit" class="btn" :disabled="loading">
+          {{ loading ? 'Logging in...' : 'Login' }}
+        </button>
         
         <!-- Vue Router Link to Register Page -->
         <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
@@ -171,5 +158,11 @@ const handleLogin = async () => {
   background-color: #C9C2E8;
   color: #211934;
   transform: translateY(-2px);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

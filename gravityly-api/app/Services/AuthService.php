@@ -30,7 +30,7 @@ class AuthService
         $user = User::where('email', $credentials['email'])->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
-            // Isso gera um erro 422 automático com esta mensagem
+            // This automatically triggers a 422 error with this message
             throw ValidationException::withMessages([
                 'email' => ['These credentials do not match our records.'],
             ]);

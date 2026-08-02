@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,10 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully',
-            'data'    => $data
+            'data'    => [
+                'user'  => new UserResource($data['user']),
+                'token' => $data['token'],
+            ],
         ], 201);
     }
 
@@ -30,7 +34,10 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful',
-            'data'    => $data
+            'data'    => [
+                'user'  => new UserResource($data['user']),
+                'token' => $data['token'],
+            ],
         ], 200);
     }
 
@@ -42,41 +49,4 @@ class AuthController extends Controller
             'message' => 'Successfully logged out'
         ], 200);
     }
-
-    public function me(Request $request): JsonResponse
-    {
-        return response()->json([
-            'data' => $request->user()
-        ], 200);
-    }
-
-    public function updateProfile(Request $request): JsonResponse
-{
-    $user = $request->user();
-
-    $validated = $request->validate([
-        'name'     => ['required', 'string', 'max:255'],
-        'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
-        'bio'      => ['nullable', 'string', 'max:1000'],
-        'avatar'   => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
-    ]);
-
-    $user->update([
-        'name'     => $validated['name'],
-        'username' => $validated['username'],
-        'bio'      => $validated['bio'] ?? null,
-    ]);
-
-    if ($request->hasFile('avatar')) {
-        $path = $request->file('avatar')->store('avatars', 'public');
-        
-        $user->profile_photo_url = url('storage/' . $path);
-        $user->save();
-    }
-
-    return response()->json([
-        'message' => 'Profile updated successfully',
-        'data'    => $user
-    ], 200);
-}
 }

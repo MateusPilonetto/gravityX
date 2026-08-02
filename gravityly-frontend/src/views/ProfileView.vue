@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { api, getToken, clearToken } from '../services/api';
 
 const user = ref(null);
 const loading = ref(true);
@@ -17,37 +18,25 @@ const avatarUrl = computed(() => {
 });
 
 onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
-  
-  if (!token) {
+  if (!getToken()) {
     router.push('/login');
     return;
   }
-  
-  try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    });
 
-    const data = await response.json();
-    
-    if (response.ok) {
-      user.value = data.data || data.user || data;
-    } else {
-      errorMessage.value = `API Error: ${response.status} - ${data.message || 'Failed to fetch data'}`;
-    }
+  try {
+    const { data } = await api.get('/me');
+    user.value = data;
   } catch (error) {
-    errorMessage.value = "Failed to connect to the backend.";
+    errorMessage.value = error.status
+      ? `API Error: ${error.status} - ${error.message}`
+      : error.message;
   } finally {
     loading.value = false;
   }
 });
 
 const handleLogout = () => {
-  localStorage.removeItem('auth_token');
+  clearToken();
   router.push('/login');
 };
 </script>

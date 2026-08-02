@@ -29,6 +29,9 @@ The local environment is managed by Docker (using `compose.yaml` and `Dockerfile
 5. Generate the Laravel application key:
     ```bash
     docker compose exec app php artisan key:generate
-6. Run the migrations and seeders to structure and populate the database with test data:
+6. Create the storage symlink so uploaded files (e.g. profile photos) are publicly reachable:
+    ```bash
+    docker compose exec app php artisan storage:link
+7. Run the migrations and seeders to structure and populate the database with test data:
     ```bash
     docker compose exec app php artisan migrate:fresh --seed

@@ -14,10 +14,11 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         User::create([
-            'name'     => 'Demo Reader',
-            'username' => 'demo_reader',
-            'email'    => 'demo@bookshelf.test',
+            'name'     => 'Demo User',
+            'username' => 'demo_user',
+            'email'    => 'demo@gravityly.test',
             'password' => 'secret123',
+            'bio'      => 'Just trying out Gravityly!',
         ]);
     }
 }

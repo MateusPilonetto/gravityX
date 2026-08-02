@@ -1,27 +1,32 @@
-# ESTÁGIO 1: Build da Aplicação
+# STAGE 1: Application Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copia os arquivos de dependência e instala
+# Copy dependency manifests and install
 COPY package*.json ./
 RUN npm install
 
-# Copia o restante do código e executa o build do Vite
+# Copy the rest of the source and run the Vite build
 COPY . .
+
+# Allows the API URL to be set at build time (defaults to the local dev API)
+ARG VITE_API_URL=http://localhost:8000/api
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
-# ESTÁGIO 2: Servidor Web Nginx
+# STAGE 2: Nginx Web Server
 FROM nginx:alpine
 
-# Copia os arquivos gerados no estágio de build para o Nginx
+# Copy the files generated in the build stage into Nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copia a configuração personalizada do Nginx para suportar o Vue Router
+# Copy the custom Nginx config so client-side routing (Vue Router) works
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expõe a porta 80 do contêiner
+# Expose the container's port 80
 EXPOSE 80
 
-# Inicia o Nginx
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

@@ -6,8 +6,8 @@ This repository is a monorepo containing both the Frontend (Vue.js) and the Back
 
 ## 📂 Project Structure
 
-* **`/frontend`**: Vue 3 + Vite application (Single Page Application).
-* **`/gravityly-api`**: Laravel 11 REST API with MSC architecture.
+* **`/gravityly-frontend`**: Vue 3 + Vite application (Single Page Application).
+* **`/gravityly-api`**: Laravel 13 REST API with MSC architecture.
 
 > **Note:** Each directory contains its own detailed `README.md` with specific instructions for that environment.
 
@@ -31,4 +31,21 @@ cp .env.example .env
 docker compose up -d --build
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
+docker compose exec app php artisan storage:link
 docker compose exec app php artisan migrate:fresh --seed
+```
+
+The API will be available at `http://localhost:8000`.
+
+### 2. Starting the Frontend
+In a separate terminal, from the project root:
+
+```bash
+cd gravityly-frontend
+cp .env.example .env
+docker compose up -d --build
+```
+
+The app will be available at `http://localhost:8080`.
+
+> **Tip:** while actively developing the frontend, running it directly with `npm install && npm run dev` (instead of through Docker) gives you hot-reload on `http://localhost:5173`.

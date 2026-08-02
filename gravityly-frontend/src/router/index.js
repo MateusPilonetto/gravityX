@@ -4,6 +4,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import EditProfileView from '../views/EditProfileView.vue'
+import { isAuthenticated } from '../services/api'
 
 const routes = [
   {
@@ -39,12 +40,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const hasToken = localStorage.getItem('auth_token');
   const isAuthPage = ['/login', '/register'].includes(to.path);
 
-  if (!hasToken && !isAuthPage) {
+  if (!isAuthenticated() && !isAuthPage) {
     next('/login');
-  } else if (hasToken && isAuthPage) {
+  } else if (isAuthenticated() && isAuthPage) {
     next('/');
   } else {
     next();

@@ -1,12 +1,13 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { api, getToken } from './services/api';
 
 const route = useRoute();
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 const user = ref(null);
 
-// Lógica para pegar o avatar inteligente para a navbar
+// Picks the right avatar for the navbar: the user's photo, or a generated placeholder
 const navAvatarUrl = computed(() => {
   if (user.value && user.value.profile_photo_url) {
     return user.value.profile_photo_url;
@@ -15,24 +16,15 @@ const navAvatarUrl = computed(() => {
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
 });
 
-// Puxa o nome de usuário apenas para montar o avatar na navbar
+// Fetches the current user just to render the navbar avatar
 onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    try {
-      const response = await fetch('http://localhost:8000/api/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        user.value = data.data || data.user || data;
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  if (!getToken()) return;
+
+  try {
+    const { data } = await api.get('/me');
+    user.value = data;
+  } catch (e) {
+    console.error(e);
   }
 });
 </script>
@@ -71,7 +63,7 @@ onMounted(async () => {
             <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <!-- Avatar da Navbar Dinâmico -->
+          <!-- Dynamic Navbar Avatar -->
           <router-link to="/profile">
             <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
           </router-link>    

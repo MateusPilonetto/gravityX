@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { api, getToken } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
@@ -15,10 +16,10 @@ const form = ref({
   name: '',
   username: '',
   bio: '',
-  profile_photo_url: '' // Guarda a URL da foto atual (se houver)
+  profile_photo_url: '' // Holds the current photo URL, if any
 });
 
-// Calcula qual avatar mostrar: Pré-visualização local > Foto do Banco > Avatar Gerado
+// Picks which avatar to display: local preview > saved photo > generated placeholder
 const displayAvatar = computed(() => {
   if (previewUrl.value) return previewUrl.value;
   if (form.value.profile_photo_url) return form.value.profile_photo_url;
@@ -28,36 +29,33 @@ const displayAvatar = computed(() => {
 });
 
 onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
+  if (!getToken()) {
+    router.push('/login');
+    return;
+  }
+
   try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const userData = data.data ? data.data : data;
-      form.value.name = userData.name;
-      form.value.username = userData.username;
-      form.value.bio = userData.bio || '';
-      form.value.profile_photo_url = userData.profile_photo_url || '';
-    }
+    const { data } = await api.get('/me');
+    form.value.name = data.name;
+    form.value.username = data.username;
+    form.value.bio = data.bio || '';
+    form.value.profile_photo_url = data.profile_photo_url || '';
   } catch (err) {
-    console.error(err);
+    error.value = err.message;
   }
 });
 
-// Aciona o clique no input hidden de arquivo
+// Opens the hidden file input
 const triggerFileInput = () => {
   fileInput.value.click();
 };
 
-// Quando o usuário escolhe uma imagem no PC/Celular
+// Runs when the user picks an image from their device
 const onFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
     selectedFile.value = file;
-    previewUrl.value = URL.createObjectURL(file); // Cria a URL temporária para mostrar na tela
+    previewUrl.value = URL.createObjectURL(file); // Temporary local URL just for the preview
   }
 };
 
@@ -65,41 +63,23 @@ const handleSave = async () => {
   error.value = '';
   successMessage.value = '';
   loading.value = true;
-  const token = localStorage.getItem('auth_token');
 
-  // Usamos FormData em vez de JSON para suportar o envio da imagem
+  // FormData instead of JSON so the image can be sent in the same request
   const formData = new FormData();
-  formData.append('_method', 'PUT'); // Truque do Laravel para aceitar arquivos na atualização
   formData.append('name', form.value.name);
   formData.append('username', form.value.username);
   formData.append('bio', form.value.bio || '');
-  
+
   if (selectedFile.value) {
-    formData.append('avatar', selectedFile.value); // O nome 'avatar' deve bater com o esperado no backend
+    formData.append('avatar', selectedFile.value); // Field name must match what the backend expects
   }
 
   try {
-    // Atenção: A requisição virou POST por causa do FormData (mas o Laravel vai ler como PUT devido ao _method)
-    const response = await fetch('http://localhost:8000/api/me', {
-      method: 'POST', 
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-        // O Content-Type não é definido aqui, o navegador cria automaticamente com o "boundary" do FormData
-      },
-      body: formData
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      successMessage.value = 'Profile updated successfully!';
-      setTimeout(() => router.push('/profile'), 1500);
-    } else {
-      error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
-    }
+    await api.put('/me', formData);
+    successMessage.value = 'Profile updated successfully!';
+    setTimeout(() => router.push('/profile'), 1500);
   } catch (err) {
-    error.value = 'Failed to connect to the server.';
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
   } finally {
     loading.value = false;
   }
@@ -115,10 +95,10 @@ const handleSave = async () => {
           <i class="fa-solid fa-chevron-left"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>
-        <div style="width: 65px;"></div> <!-- Espaçador para manter o título no centro -->
+        <div style="width: 65px;"></div> <!-- Spacer to keep the title centered -->
       </div>
 
-      <!-- Avatar Interativo -->
+      <!-- Interactive Avatar -->
       <div class="avatar-section">
         <div class="avatar-wrapper" @click="triggerFileInput">
           <img class="avatar-preview" :src="displayAvatar" alt="Profile Avatar" />
@@ -126,7 +106,7 @@ const handleSave = async () => {
             <i class="fa-solid fa-camera"></i>
           </div>
         </div>
-        <!-- Input invisível -->
+        <!-- Hidden file input -->
         <input 
           type="file" 
           ref="fileInput" 
@@ -139,7 +119,7 @@ const handleSave = async () => {
         </button>
       </div>
 
-      <!-- Formulário Moderno -->
+      <!-- Form -->
       <form @submit.prevent="handleSave" class="form-body">
         
         <transition name="fade">
@@ -189,7 +169,7 @@ const handleSave = async () => {
   color: #fff;
 }
 
-/* Painel de Vidro (Glassmorphism) */
+/* Glass Panel (Glassmorphism) */
 .glass-panel {
   width: 100%;
   max-width: 500px;
@@ -202,7 +182,7 @@ const handleSave = async () => {
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Cabeçalho */
+/* Header */
 .edit-header {
   display: flex;
   justify-content: space-between;
@@ -229,7 +209,7 @@ const handleSave = async () => {
   color: #fff;
 }
 
-/* Seção do Avatar */
+/* Avatar Section */
 .avatar-section {
   display: flex;
   flex-direction: column;
@@ -297,7 +277,7 @@ const handleSave = async () => {
   color: #FFC857;
 }
 
-/* Formulário */
+/* Form */
 .form-body {
   display: flex;
   flex-direction: column;
@@ -316,7 +296,7 @@ const handleSave = async () => {
   color: #C9C2E8;
 }
 
-/* Inputs com estilo Glass */
+/* Glass-styled Inputs */
 .glass-input {
   background-color: rgba(20, 15, 35, 0.5);
   border: 1px solid rgba(111, 92, 255, 0.2);
@@ -339,7 +319,7 @@ const handleSave = async () => {
   color: rgba(201, 194, 232, 0.4);
 }
 
-/* Botão de Salvar */
+/* Save Button */
 .btn-submit {
   background-color: #6F5CFF;
   color: white;
@@ -364,7 +344,7 @@ const handleSave = async () => {
   box-shadow: 0 0 15px rgba(255, 200, 87, 0.4);
 }
 
-/* Alertas Animados */
+/* Animated Alerts */
 .alert-box {
   padding: 12px 16px;
   border-radius: 8px;
