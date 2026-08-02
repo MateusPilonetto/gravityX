@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { userStore } from './store'; 
+import { useRouter } from 'vue-router';
+
 
 const route = useRoute();
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
@@ -21,6 +23,14 @@ const navAvatarUrl = computed(() => {
   const name = user.value?.name ? encodeURIComponent(user.value.name) : 'U';
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
 });
+
+const router = useRouter();
+
+const handleLogout = () => {
+  localStorage.removeItem('auth_token');
+  
+  router.push('/login');
+};
 </script>
 
 <template>
@@ -29,9 +39,17 @@ const navAvatarUrl = computed(() => {
         <img alt="Gravityly logo" class="logo" src="./assets/gravityly-logo-light.svg" width="125" height="125" />
         <h1 class="logo-title">Gravityly</h1>
       </div>
-      <div class="notifications-area glass-effect">
+      <section class="top-area">
+        <div class="buttons glass-effect">
         <i class="fa-solid fa-bell fa-2xl notification-icon"></i>
       </div>
+      <div class="glass-effect buttons">
+        <a href="#" @click.prevent="handleLogout" class="sua-classe-de-css-aqui">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </a>
+      </div>
+      </section>
+      
     </header>
 
 
@@ -77,6 +95,10 @@ header {
   box-sizing: border-box;
 }
 
+.top-area {
+  display: flex;
+}
+
 .logo {
   display: block;
   border-radius: 2rem;
@@ -94,7 +116,7 @@ header {
   color: #FFC857;
 }
 
-.notifications-area {
+.buttons {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -158,7 +180,6 @@ header {
   cursor: pointer;
   transition: all 0.3s ease;
 }
-
 
 .nav-icon.active, 
 .nav-icon:hover {
