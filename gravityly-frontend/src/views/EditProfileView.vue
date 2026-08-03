@@ -2,10 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { userStore } from '../store';
-
-const loggedUsername = computed(() => {
-  return userStore.currentUser?.username || '';
-});
+import { api, clearToken, getProfileAvatarUrl } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
@@ -25,38 +22,38 @@ const form = ref({
 
 const displayAvatar = computed(() => {
   if (previewUrl.value) return previewUrl.value;
-  
-  let url = form.value?.profile_photo_url;
-  
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) {
-      return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
-  }
-  
-  const name = form.value?.name ? encodeURIComponent(form.value.name) : 'U';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
+
+  return getProfileAvatarUrl(form.value);
 });
 
-onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
+const redirectToLogin = () => {
+  clearToken();
+  userStore.clearUser();
+  router.replace('/login');
+};
+
+const loadProfile = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const userData = data.data ? data.data : data;
-      form.value.name = userData.name;
-      form.value.username = userData.username;
-      form.value.bio = userData.bio || '';
-      form.value.profile_photo_url = userData.profile_photo_url || '';
-    }
+    const response = await api.get('/me');
+    const userData = response.data;
+
+    form.value.name = userData.name;
+    form.value.username = userData.username;
+    form.value.bio = userData.bio || '';
+    form.value.profile_photo_url = userData.profile_photo_url || '';
   } catch (err) {
-    console.error(err);
+    if (err.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    console.error('Erro ao carregar o perfil', err);
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
   }
+};
+
+onMounted(() => {
+  void loadProfile();
 });
 
 const triggerFileInput = () => {
@@ -75,10 +72,8 @@ const handleSave = async () => {
   error.value = '';
   successMessage.value = '';
   loading.value = true;
-  const token = localStorage.getItem('auth_token');
 
   const formData = new FormData();
-  formData.append('_method', 'PUT');
   formData.append('name', form.value.name);
   formData.append('username', form.value.username);
   formData.append('bio', form.value.bio || '');
@@ -88,33 +83,21 @@ const handleSave = async () => {
   }
 
   try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      method: 'POST', 
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
-      body: formData
-    });
+    const data = await api.put('/me', formData);
+    userStore.setCurrentUser(data.data);
+    form.value.profile_photo_url = data.data.profile_photo_url || '';
+    previewUrl.value = null;
 
-    let data;
-    try {
-        data = await response.json();
-    } catch (parseError) {
-        throw new Error("O backend não devolveu um JSON. O servidor pode estar fora do ar.");
-    }
-
-    if (response.ok) {
-      userStore.setCurrentUser(data.data); 
-      
-      successMessage.value = 'Profile updated successfully!';
-      setTimeout(() => router.push(`/profile/${loggedUsername.value}`), 1500);
-    } else {
-      error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
-    }
+    successMessage.value = 'Profile updated successfully!';
+    setTimeout(() => router.push('/profile'), 1500);
   } catch (err) {
-    console.error("Error", err);
-    error.value = 'Error ' + err.message;
+    if (err.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    console.error('Erro ao atualizar perfil', err);
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
   } finally {
     loading.value = false;
   }
@@ -126,7 +109,7 @@ const handleSave = async () => {
     <div class="glass-panel">
       
       <div class="edit-header">
-        <router-link :to="`/profile/${loggedUsername}`" class="back-btn">
+        <router-link to="/profile" class="back-btn">
           <i class="fa-solid fa-chevron-left"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>

@@ -24,7 +24,7 @@ class ProfileService
     {
         $path = $avatar->store('avatars', 'public');
 
-        return Storage::disk('public')->url($path);
+        return '/storage/'.$path;
     }
 
     private function deleteCurrentAvatar(User $user): void
@@ -33,10 +33,17 @@ class ProfileService
             return;
         }
 
-        $publicUrlPrefix = Storage::disk('public')->url('');
-        $currentPath = str_replace($publicUrlPrefix, '', $user->profile_photo_url);
+        $currentPath = parse_url($user->profile_photo_url, PHP_URL_PATH) ?? $user->profile_photo_url;
+        $currentPath = ltrim($currentPath, '/');
 
-        if ($currentPath && Storage::disk('public')->exists($currentPath)) {
+        $publicUrlPath = parse_url(Storage::disk('public')->url(''), PHP_URL_PATH) ?? '/storage';
+        $publicUrlPath = trim($publicUrlPath, '/');
+
+        if (str_starts_with($currentPath, $publicUrlPath.'/')) {
+            $currentPath = substr($currentPath, strlen($publicUrlPath) + 1);
+        }
+
+        if (str_starts_with($currentPath, 'avatars/') && Storage::disk('public')->exists($currentPath)) {
             Storage::disk('public')->delete($currentPath);
         }
     }

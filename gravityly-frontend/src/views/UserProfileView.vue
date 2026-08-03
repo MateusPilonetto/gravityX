@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, getToken } from '../services/api';
+import { api, clearToken, getProfileAvatarUrl, getToken } from '../services/api';
+import { userStore } from '../store';
 
 const route = useRoute();
 const router = useRouter();
@@ -11,35 +12,65 @@ const loading = ref(true);
 const errorMessage = ref(''); 
 const isFollowing = ref(false);
 const actionLoading = ref(false);
+const actionError = ref('');
+let activeRequest = 0;
 
-const avatarUrl = computed(() => {
-  let url = profileUser.value?.profile_photo_url;
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
-  }
-  const name = profileUser.value?.name ? encodeURIComponent(profileUser.value.name) : 'User';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
+const isOwnProfile = computed(() => {
+  return Boolean(
+    profileUser.value &&
+    userStore.currentUser &&
+    profileUser.value.id === userStore.currentUser.id
+  );
 });
 
+const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
+
+const redirectToLogin = () => {
+  clearToken();
+  userStore.clearUser();
+  router.replace('/login');
+};
+
 const fetchUserProfile = async () => {
+  const requestId = ++activeRequest;
   loading.value = true;
   errorMessage.value = '';
   
   try {
-    const usernameURL = route.params.username;
-    
-    const response = await api.get(`/users/${usernameURL}`);    
-    const responseData = response.data || response;
+    const username = route.params.username;
 
-    profileUser.value = responseData.user || responseData;
-    isFollowing.value = responseData.is_following || false;
+    if (typeof username !== 'string' || !username) {
+      throw new Error('Missing profile username.');
+    }
+    
+    const response = await api.get(`/users/${encodeURIComponent(username)}`);
+
+    if (requestId !== activeRequest) return;
+
+    if (!response.user || typeof response.user !== 'object' || !response.user.username) {
+      throw new Error('Profile response did not include a user.');
+    }
+
+    profileUser.value = response.user;
+    isFollowing.value = Boolean(response.is_following);
     
   } catch (error) {
+    if (requestId !== activeRequest) return;
+
+    if (error.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
     console.error("Erro ao carregar o perfil", error);
-    errorMessage.value = 'User not found.';
+    profileUser.value = null;
+    errorMessage.value = error.status === 404
+      ? 'User not found.'
+      : 'Could not load profile.';
   } finally {
-    loading.value = false;
+    if (requestId === activeRequest) {
+      loading.value = false;
+    }
   }
 };
 
@@ -56,20 +87,33 @@ onMounted(async () => {
 });
 
 const handleFollowToggle = async () => {
-  if (actionLoading.value) return;
+  if (isOwnProfile.value || actionLoading.value) return;
   actionLoading.value = true;
+  actionError.value = '';
   
   try {
-    const { data } = await api.post(`users/${profileUser.value.username}/follow`);
-    isFollowing.value = data.is_following;
-    
-    if (data.is_following) {
-      profileUser.value.followers_count++;
-    } else {
-      profileUser.value.followers_count--;
+    const path = `/users/${encodeURIComponent(profileUser.value.username)}/follow`;
+    const response = isFollowing.value
+      ? await api.delete(path)
+      : await api.post(path);
+
+    isFollowing.value = Boolean(response.is_following);
+
+    if (typeof response.followers_count === 'number') {
+      profileUser.value.followers_count = response.followers_count;
+    }
+
+    if (typeof response.viewer_following_count === 'number' && userStore.currentUser) {
+      userStore.currentUser.following_count = response.viewer_following_count;
     }
   } catch (error) {
-    console.error("Erro ao seguir", error);
+    if (error.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    console.error('Erro ao atualizar seguimento', error);
+    actionError.value = error.firstMessage ? error.firstMessage() : error.message;
   } finally {
     actionLoading.value = false;
   }
@@ -100,7 +144,11 @@ const handleFollowToggle = async () => {
           <div class="info-top">
             <h2 class="username">{{ profileUser.username }}</h2>
             
+            <router-link v-if="isOwnProfile" to="/profile/edit" class="btn-edit">
+              Edit profile
+            </router-link>
             <button 
+              v-else
               @click="handleFollowToggle" 
               class="btn-edit" 
               :class="{ 'btn-following': isFollowing }"
@@ -109,6 +157,7 @@ const handleFollowToggle = async () => {
               {{ actionLoading ? '...' : (isFollowing ? 'Following' : 'Follow') }}
             </button>
           </div>
+          <p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
 
           <ul class="info-stats">
             <li><span class="stat-count">{{ profileUser.posts_count || 0 }}</span> posts</li>
@@ -154,6 +203,7 @@ const handleFollowToggle = async () => {
 .username { font-size: 1.25rem; font-weight: 500; margin: 0; color: #C9C2E8; }
 .btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.1); }
 .btn-following { background-color: transparent; border: 1px solid #6F5CFF; color: #fff; }
+.action-error { color: #ff8b8b; font-size: 0.85rem; margin: -12px 0 12px; }
 .info-stats { display: flex; list-style: none; padding: 0; margin: 0 0 20px 0; gap: 40px; }
 .stat-count { font-weight: bold; color: #FFC857; }
 .info-bio { font-size: 0.95rem; line-height: 1.5; }

@@ -1,41 +1,65 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { userStore } from './store'; 
-import { api } from './services/api'; 
+import { api, clearToken, getProfileAvatarUrl, getToken } from './services/api';
 
 const route = useRoute();
 const router = useRouter();
 
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 
-const navAvatarUrl = computed(() => {
-  let url = userStore.currentUser?.profile_photo_url;
-  
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
-  }
-  
-  const name = userStore.currentUser?.name ? encodeURIComponent(userStore.currentUser.name) : 'U';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
-});
+const navAvatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 50));
 
-onMounted(async () => {
+let activeSessionRequest = 0;
+
+const redirectToLogin = () => {
+  clearToken();
+  userStore.clearUser();
+
   if (!isAuthPage.value) {
-    try {
-      const { data } = await api.get('/me');
-    
-      userStore.currentUser = data.data || data; 
-    } catch (error) {
-      console.error("Erro ao carregar sessão global:", error);
-    }
+    router.replace('/login');
   }
-});
+};
+
+const loadCurrentUser = async () => {
+  const requestId = ++activeSessionRequest;
+
+  if (!getToken()) {
+    redirectToLogin();
+    return;
+  }
+
+  try {
+    const response = await api.get('/me');
+
+    if (requestId === activeSessionRequest) {
+      userStore.currentUser = response.data;
+    }
+  } catch (error) {
+    if (requestId !== activeSessionRequest) return;
+
+    if (error.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    console.error('Erro ao carregar sessão global:', error);
+  }
+};
+
+watch(() => route.path, () => {
+  if (isAuthPage.value) {
+    activeSessionRequest++;
+    userStore.clearUser();
+    return;
+  }
+
+  void loadCurrentUser();
+}, { immediate: true });
 
 const handleLogout = () => {
-  localStorage.removeItem('auth_token');
-  window.location.href = '/login';
+  redirectToLogin();
 };
 </script>
 
@@ -81,7 +105,7 @@ const handleLogout = () => {
             <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <router-link :to="`/profile/${userStore.currentUser?.username}`" class="nav-link">
+          <router-link to="/profile" class="nav-link">
             <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
           </router-link>    
         </nav>   

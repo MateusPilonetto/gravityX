@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../services/api';
+import { api, getProfileAvatarUrl } from '../services/api';
 
 const router = useRouter();
 
@@ -29,18 +29,10 @@ const search = async () => {
 }
 
 const goToProfile = (username) => {
-    router.push(`/profile/${username}`);
+    router.push({ name: 'user-profile', params: { username } });
 };
 
-const getAvatarUrl = (user) => {
-    let url = user.profile_photo_url;
-    if (url) {
-        const match = url.match(/avatars\/([^/]+)$/);
-        if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
-    const name = user.name ? encodeURIComponent(user.name) : 'User';
-    return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=100&bold=true`;
-};
+const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
 </script>
 
 <template>

@@ -1,34 +1,47 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { api, getToken } from '../services/api';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { api, clearToken, getProfileAvatarUrl, getToken } from '../services/api';
+import { userStore } from '../store';
 
 const router = useRouter();
+const route = useRoute();
 
-const profileUser = ref(null); 
+const profileUser = ref(null);
 const loading = ref(true);
-const errorMessage = ref(''); 
+const errorMessage = ref('');
+const isOwnProfile = ref(true);
 
-const avatarUrl = computed(() => {
-  let url = profileUser.value?.profile_photo_url;
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
-  }
-  const name = profileUser.value?.name ? encodeURIComponent(profileUser.value.name) : 'User';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
-});
+const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
 
-const fetchMyProfile = async () => {
+const fetchProfile = async () => {
   loading.value = true;
   errorMessage.value = '';
-  
+
   try {
-    const { data } = await api.get('/me');
-    profileUser.value = data.data || data; 
+    const username = route.params.username;
+
+    let response;
+
+    if (username) {
+      isOwnProfile.value = false;
+      response = await api.get(`/users/${encodeURIComponent(username)}`);
+      profileUser.value = response.user;
+    } else {
+      isOwnProfile.value = true;
+      response = await api.get('/me');
+      profileUser.value = response.data;
+    }
   } catch (error) {
-    console.error("Erro ao carregar o perfil", error);
-    errorMessage.value = 'Could not load your profile.';
+    if (error.status === 401) {
+      clearToken();
+      userStore.clearUser();
+      router.replace('/login');
+      return;
+    }
+
+    console.error(error);
+    errorMessage.value = 'Could not load profile.';
   } finally {
     loading.value = false;
   }
@@ -39,12 +52,21 @@ onMounted(async () => {
     router.push('/login');
     return;
   }
-  await fetchMyProfile();
+
+  await fetchProfile();
 });
 
+watch(
+  () => route.params.username,
+  () => {
+    fetchProfile();
+  }
+);
+
 const handleLogout = () => {
-  localStorage.removeItem('auth_token');
-  window.location.href = '/login'; 
+  clearToken();
+  userStore.clearUser();
+  router.replace('/login');
 };
 </script>
 
@@ -72,7 +94,7 @@ const handleLogout = () => {
           <div class="info-top">
             <h2 class="username">{{ profileUser.username }}</h2>
             
-            <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
+            <router-link v-if="isOwnProfile" to="/profile/edit" class="btn-edit">Edit profile</router-link>
             <a href="#" @click.prevent="handleLogout" class="settings-icon" title="Log Out">
               <i class="fa-solid fa-arrow-right-from-bracket"></i>
             </a>

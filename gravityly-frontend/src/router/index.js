@@ -32,14 +32,14 @@ const routes = [
     component: ProfileView
   },
   {
-    path: '/profile/:username',
-    name: 'user-profile',
-    component: UserProfileView,
-  },
-  {
     path: '/profile/edit',
     name: 'edit-profile',
     component: EditProfileView
+  },
+  {
+    path: '/profile/:username',
+    name: 'user-profile',
+    component: UserProfileView,
   },
   {
     path: '/search',

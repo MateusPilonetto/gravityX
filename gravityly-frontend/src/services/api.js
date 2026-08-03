@@ -17,6 +17,34 @@ export function isAuthenticated() {
   return Boolean(getToken());
 }
 
+export function getProfileAvatarUrl(user, size = 150) {
+  const profilePhotoUrl = user?.profile_photo_url;
+  const name = encodeURIComponent(user?.name || user?.username || 'User');
+  const fallbackUrl = `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=${size}&bold=true`;
+
+  if (!profilePhotoUrl) {
+    return fallbackUrl;
+  }
+
+  try {
+    const apiOrigin = new URL(API_BASE_URL, window.location.origin).origin;
+    const photoUrl = new URL(profilePhotoUrl, apiOrigin);
+    const path = photoUrl.pathname.replace(/^\/+/, '');
+
+    if (path.startsWith('storage/')) {
+      return `${apiOrigin}/${path}${photoUrl.search}${photoUrl.hash}`;
+    }
+
+    if (path.startsWith('avatars/')) {
+      return `${apiOrigin}/storage/${path}${photoUrl.search}${photoUrl.hash}`;
+    }
+
+    return photoUrl.href;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 export class ApiError extends Error {
   constructor(message, status, errors = null) {
     super(message);
@@ -82,4 +110,5 @@ export const api = {
   get: (path, options = {}) => request(path, { method: 'GET', ...options }),
   post: (path, body, options = {}) => request(path, { method: 'POST', body, ...options }),
   put: (path, body, options = {}) => request(path, { method: 'PUT', body, ...options }),
+  delete: (path, options = {}) => request(path, { method: 'DELETE', ...options }),
 };

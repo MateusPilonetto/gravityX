@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Services\ProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ProfileController extends Controller
 {
@@ -17,33 +16,30 @@ class ProfileController extends Controller
         private ProfileService $profileService
     ) {}
 
-    public function show(Request $request, $username = null): JsonResponse
-{
-    if (!$username) {
+    public function show(Request $request, ?string $username = null): JsonResponse
+    {
+        if ($username === null) {
+            $user = $this->loadProfileCounts($request->user());
+
+            return response()->json([
+                'message' => 'Profile retrieved successfully',
+                'data' => new UserResource($user),
+            ], 200);
+        }
+
+        $user = $this->loadProfileCounts($this->findUserByUsername($username));
+
+        $isFollowing = $request->user()->id !== $user->id
+            && Follow::where('follower_id', $request->user()->id)
+                ->where('following_id', $user->id)
+                ->exists();
+
         return response()->json([
             'message' => 'Profile retrieved successfully',
-            'data'    => new UserResource($request->user()),
+            'user' => new UserResource($user),
+            'is_following' => $isFollowing,
         ], 200);
     }
-
-    $user = User::withCount(['posts', 'followers', 'following'])
-                ->where('username', $username)
-                ->firstOrFail();
-
-    $isFollowing = false;
-    
-    if (Auth::check() && Auth::id() !== $user->id) {
-        $isFollowing = Follow::where('follower_id', Auth::id())
-                             ->where('following_id', $user->id)
-                             ->exists();
-    }
-
-    return response()->json([
-        'message' => 'Profile retrieved successfully',
-        'user'    => new UserResource($user),
-        'is_following' => $isFollowing
-    ], 200);
-}
 
     public function update(UpdateProfileRequest $request): JsonResponse
     {
@@ -52,6 +48,7 @@ class ProfileController extends Controller
             $request->validated(),
             $request->file('avatar')
         );
+        $user = $this->loadProfileCounts($user);
 
         return response()->json([
             'message' => 'Profile updated successfully',
@@ -75,28 +72,63 @@ class ProfileController extends Controller
         return response()->json($users);
     }
 
-    public function toggleFollow($username)
+    public function follow(Request $request, string $username): JsonResponse
     {
-        $userToFollow = User::where('username', $username)->firstOrFail();
-        $currentUser = Auth::user();
+        $currentUser = $request->user();
+        $userToFollow = $this->findUserByUsername($username);
 
-        if ($currentUser->id === $userToFollow->id) {
-            return response()->json(['message' => 'You cannot follow yourself '], 400);
+        if ($currentUser->is($userToFollow)) {
+            return response()->json(['message' => 'You cannot follow yourself.'], 422);
         }
 
-        $follow = Follow::where('follower_id', $currentUser->id)
-                        ->where('following_id', $userToFollow->id)
-                        ->first();
+        Follow::firstOrCreate([
+            'follower_id' => $currentUser->id,
+            'following_id' => $userToFollow->id,
+        ]);
 
-        if ($follow) {
-            $follow->delete();
-            return response()->json(['message' => 'Deixou de seguir', 'is_following' => false]);
-        } else {
-            Follow::create([
-                'follower_id' => $currentUser->id,
-                'following_id' => $userToFollow->id
-            ]);
-            return response()->json(['message' => 'Seguindo', 'is_following' => true]);
+        return $this->followResponse($currentUser, $userToFollow, true, 'Following');
+    }
+
+    public function unfollow(Request $request, string $username): JsonResponse
+    {
+        $currentUser = $request->user();
+        $userToUnfollow = $this->findUserByUsername($username);
+
+        if ($currentUser->is($userToUnfollow)) {
+            return response()->json(['message' => 'You cannot unfollow yourself.'], 422);
         }
+
+        Follow::where('follower_id', $currentUser->id)
+            ->where('following_id', $userToUnfollow->id)
+            ->delete();
+
+        return $this->followResponse($currentUser, $userToUnfollow, false, 'Unfollowed');
+    }
+
+    private function findUserByUsername(string $username): User
+    {
+        return User::where('username', $username)->firstOrFail();
+    }
+
+    private function loadProfileCounts(User $user): User
+    {
+        return $user->loadCount(['posts', 'followers', 'following']);
+    }
+
+    private function followResponse(
+        User $currentUser,
+        User $profileUser,
+        bool $isFollowing,
+        string $message
+    ): JsonResponse {
+        $this->loadProfileCounts($profileUser);
+        $currentUser->loadCount('following');
+
+        return response()->json([
+            'message' => $message,
+            'is_following' => $isFollowing,
+            'followers_count' => $profileUser->followers_count,
+            'viewer_following_count' => $currentUser->following_count,
+        ]);
     }
 }

@@ -13,5 +13,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me', [ProfileController::class, 'update']);
     Route::get('/search', [\App\Http\Controllers\ProfileController::class, 'search']);
     Route::get('/users/{username}', [\App\Http\Controllers\ProfileController::class, 'show'])->where('username', '.*');    
-    Route::post('/users/{username}/follow', [\App\Http\Controllers\ProfileController::class, 'toggleFollow']);
+    Route::post('/users/{username}/follow', [ProfileController::class, 'follow']);
+    Route::delete('/users/{username}/follow', [ProfileController::class, 'unfollow']);
 });
