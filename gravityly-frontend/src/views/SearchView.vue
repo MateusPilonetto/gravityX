@@ -28,7 +28,7 @@ const search = async () => {
     }
 }
 
-const irParaPerfil = (username) => {
+const goToProfile = (username) => {
     router.push(`/profile/${username}`);
 };
 
@@ -73,7 +73,7 @@ const getAvatarUrl = (user) => {
                 v-for="user in searchResults" 
                 :key="user.id" 
                 class="user-card glass-effect"
-                @click="irParaPerfil(user.username)"
+                @click="goToProfile(user.username)"
             >
                 <img :src="getAvatarUrl(user)" class="card-avatar" alt="Avatar">
                 <div class="card-info">
