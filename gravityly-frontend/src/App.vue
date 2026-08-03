@@ -1,38 +1,41 @@
 <script setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { userStore } from './store'; 
-import { useRouter } from 'vue-router';
-
-const loggedUsername = computed(() => {
-  return userStore.currentUser?.username || '';
-});
+import { api } from './services/api'; 
 
 const route = useRoute();
+const router = useRouter();
+
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
 
-const user = computed(() => userStore.currentUser);
-
 const navAvatarUrl = computed(() => {
-  let url = user.value?.profile_photo_url;
+  let url = userStore.currentUser?.profile_photo_url;
   
   if (url) {
     const match = url.match(/avatars\/([^/]+)$/);
-    if (match) {
-      return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
+    if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
   }
   
-  const name = user.value?.name ? encodeURIComponent(user.value.name) : 'U';
+  const name = userStore.currentUser?.name ? encodeURIComponent(userStore.currentUser.name) : 'U';
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
 });
 
-const router = useRouter();
+onMounted(async () => {
+  if (!isAuthPage.value) {
+    try {
+      const { data } = await api.get('/me');
+    
+      userStore.currentUser = data.data || data; 
+    } catch (error) {
+      console.error("Erro ao carregar sessão global:", error);
+    }
+  }
+});
 
 const handleLogout = () => {
   localStorage.removeItem('auth_token');
-  
-  router.push('/login');
+  window.location.href = '/login';
 };
 </script>
 
@@ -78,7 +81,7 @@ const handleLogout = () => {
             <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <router-link :to="`/profile/${loggedUsername}`">
+          <router-link :to="`/profile/${userStore.currentUser?.username}`" class="nav-link">
             <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
           </router-link>    
         </nav>   

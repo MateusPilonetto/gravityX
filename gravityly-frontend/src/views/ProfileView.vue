@@ -1,25 +1,70 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { api, getToken, clearToken } from '../services/api';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { api, getToken } from '../services/api';
 
-const user = ref(null);
-const loading = ref(true);
-const errorMessage = ref(''); 
+const route = useRoute();
 const router = useRouter();
 
+// Variáveis de Estado
+const profileUser = ref(null); // O dono do perfil que estamos visitando
+const loggedInUser = ref(null); // Você (a pessoa logada)
+const loading = ref(true);
+const errorMessage = ref(''); 
+const isFollowing = ref(false);
+const actionLoading = ref(false);
+
+// Verifica de quem é o perfil
+const isMyProfile = computed(() => {
+  if (!loggedInUser.value || !profileUser.value) return false;
+  return loggedInUser.value.username === profileUser.value.username;
+});
+
+// Calcula a foto (com o Rolo Compressor do Docker)
 const avatarUrl = computed(() => {
-  let url = user.value?.profile_photo_url;
-  
+  let url = profileUser.value?.profile_photo_url;
   if (url) {
     const match = url.match(/avatars\/([^/]+)$/);
-    if (match) {
-      return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
+    if (match) return `http://localhost:8000/storage/avatars/${match[1]}`;
   }
-  
-  const name = user.value?.name ? encodeURIComponent(user.value.name) : 'User';
+  const name = profileUser.value?.name ? encodeURIComponent(profileUser.value.name) : 'User';
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
+});
+
+const fetchMe = async () => {
+  try {
+    const { data } = await api.get('/me');
+    loggedInUser.value = data.data || data; 
+  } catch (error) {
+    console.error("Erro ao identificar o usuário logado", error);
+  }
+};
+
+const fetchProfile = async () => {
+  loading.value = true;
+  errorMessage.value = '';
+  
+  try {
+    const usernameURL = route.params.username;
+    
+    const response = await api.get(`/users${usernameURL}`);    
+    const responseData = response.data || response;
+    
+    console.log("DADOS DESEMPACOTADOS:", responseData);
+
+    profileUser.value = responseData.user || responseData;
+    isFollowing.value = responseData.is_following || false;
+    
+  } catch (error) {
+    console.error("ERRO REAL DO BACKEND:", error.response?.data || error);
+    errorMessage.value = 'User not found.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+watch(() => route.params.username, () => {
+  fetchProfile();
 });
 
 onMounted(async () => {
@@ -27,42 +72,55 @@ onMounted(async () => {
     router.push('/login');
     return;
   }
-
-  try {
-    const { data } = await api.get('/me');
-    user.value = data;
-  } catch (error) {
-    errorMessage.value = error.status
-      ? `API Error: ${error.status} - ${error.message}`
-      : error.message;
-  } finally {
-    loading.value = false;
-  }
-
+  await fetchMe();
+  await fetchProfile();
 });
 
+const handleFollowToggle = async () => {
+  if (actionLoading.value) return;
+  actionLoading.value = true;
+  
+  try {
+    const { data } = await api.post(`/users/${profileUser.value.username}/follow`);
+    isFollowing.value = data.is_following;
+    
+    // Atualiza o contador na hora
+    if (data.is_following) {
+      profileUser.value.followers_count++;
+    } else {
+      profileUser.value.followers_count--;
+    }
+  } catch (error) {
+    console.error("Erro ao seguir", error);
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+// O Logout que limpa a memória
 const handleLogout = () => {
-  clearToken();
-  router.push('/login');
+  localStorage.removeItem('auth_token');
+  window.location.href = '/login'; 
 };
 </script>
 
 <template>
   <div class="profile-container">
     
+    <!-- Tela de Carregamento -->
     <div v-if="loading" class="center-message">
       <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: #6F5CFF;"></i>
     </div>
     
+    <!-- Tela de Erro (Usuário não existe) -->
     <div v-else-if="errorMessage" class="center-message error-box">
       <i class="fa-solid fa-triangle-exclamation fa-2xl" style="color: #ff5d5d;"></i>
       <p>{{ errorMessage }}</p>
-      <button @click="handleLogout" class="btn-logout">Log Out</button>
+      <button @click="router.push('/')" class="btn-back">Go to Feed</button>
     </div>
     
-    <div v-else-if="user" class="gravityly-layout">
+    <div v-else-if="profileUser" class="gravityly-layout">
       
-
       <header class="profile-header">
         <div class="profile-avatar-container">
           <img class="profile-avatar" :src="avatarUrl" alt="User avatar">
@@ -70,21 +128,38 @@ const handleLogout = () => {
 
         <section class="profile-info">
           <div class="info-top">
-            <h2 class="username">{{ user.username || 'username' }}</h2>
-            <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
-            <router-link to="/profile/edit" class="settings-icon"><i class="fa-solid fa-gear"></i></router-link>
+            <h2 class="username">{{ profileUser.username }}</h2>
+            
+            <template v-if="isMyProfile">
+              <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
+              <a href="#" @click.prevent="handleLogout" class="settings-icon" title="Log Out">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              </a>
+            </template>
+            
+            <template v-else>
+              <button 
+                @click="handleFollowToggle" 
+                class="btn-edit" 
+                :class="{ 'btn-following': isFollowing }"
+                :disabled="actionLoading"
+              >
+                {{ actionLoading ? '...' : (isFollowing ? 'Following' : 'Follow') }}
+              </button>
+            </template>
+
           </div>
 
           <ul class="info-stats">
-            <li><span class="stat-count">{{ user.posts_count || 0 }}</span> posts</li>
-            <li><span class="stat-count">{{ user.followers_count || 0 }}</span> followers</li>
-            <li><span class="stat-count">{{ user.following_count || 0 }}</span> following</li>
+            <li><span class="stat-count">{{ profileUser.posts_count || 0 }}</span> posts</li>
+            <li><span class="stat-count">{{ profileUser.followers_count || 0 }}</span> followers</li>
+            <li><span class="stat-count">{{ profileUser.following_count || 0 }}</span> following</li>
           </ul>
 
           <div class="info-bio">
-            <h1 class="fullname">{{ user.name || 'User' }}</h1>
+            <h1 class="fullname">{{ profileUser.name || profileUser.username }}</h1>
             <div class="bio-text">
-              {{ user.bio || 'Add a bio in Edit Profile.' }}
+              {{ profileUser.bio || (isMyProfile ? 'Add a bio in Edit Profile.' : '') }}
             </div>
           </div>
         </section>
@@ -92,6 +167,7 @@ const handleLogout = () => {
 
       <div class="profile-tabs">
         <a href="#" class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</a>
+        <a href="#" v-if="isMyProfile" class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</a>
       </div>
 
       <div class="posts-grid">
@@ -102,6 +178,13 @@ const handleLogout = () => {
       </div>
       
     </div>
+
+    <div v-else class="center-message error-box">
+      <i class="fa-solid fa-bug fa-2xl" style="color: #FFC857;"></i>
+      <p>Ocorreu um erro desconhecido ao carregar a interface.</p>
+      <button @click="router.push('/')" class="btn-back">Voltar ao Início</button>
+    </div>
+
   </div>
 </template>
 
@@ -132,15 +215,20 @@ const handleLogout = () => {
   margin: 0 auto;
 }
 
-.btn-logout {
+.btn-back {
   background-color: transparent;
-  color: #ff5d5d;
-  border: 1px solid #ff5d5d;
+  color: #fff;
+  border: 1px solid #6F5CFF;
   padding: 10px 20px;
   border-radius: 8px;
   font-weight: bold;
   cursor: pointer;
   margin-top: 15px;
+  transition: 0.3s;
+}
+
+.btn-back:hover {
+  background-color: rgba(111, 92, 255, 0.2);
 }
 
 /* Header: Avatar + Info */
@@ -194,19 +282,34 @@ const handleLogout = () => {
   font-size: 14px;
   font-weight: bold;
   text-decoration: none;
-  transition: all 0.2s;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-edit:hover { 
   background-color: rgba(255, 255, 255, 0.2); 
 }
 
-.settings-icon {
+.btn-following {
+  background-color: transparent;
+  border: 1px solid #6F5CFF;
   color: #fff;
+}
+
+.btn-following:hover {
+  background-color: rgba(111, 92, 255, 0.1);
+  border-color: #ff5d5d;
+  color: #ff5d5d;
+}
+
+.settings-icon {
+  color: #ff5d5d; /* Deixei o ícone de logout vermelho para destacar */
   font-size: 1.2rem;
   text-decoration: none;
+  transition: 0.2s;
 }
+.settings-icon:hover { opacity: 0.7; }
 
 /* Line 2 */
 .info-stats {
