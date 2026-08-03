@@ -7,7 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Like extends Model
 {
-    protected $fillable = ['user_id', 'post_id'];
+    protected $fillable = ['post_id'];
+
+    protected function casts(): array
+    {
+        return [
+            'user_id' => 'integer',
+            'post_id' => 'integer',
+        ];
+    }
 
     public function user(): BelongsTo
     {

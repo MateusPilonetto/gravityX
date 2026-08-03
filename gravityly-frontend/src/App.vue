@@ -115,7 +115,7 @@ const handleLogout = () => {
             <i class="fa-solid fa-magnifying-glass nav-icon"></i>
           </router-link>        
           
-          <router-link to="/post/create" class="nav-link">
+          <router-link to="/posts/create" class="nav-link">
             <i class="fa-solid fa-square-plus nav-icon"></i>
           </router-link>        
           
