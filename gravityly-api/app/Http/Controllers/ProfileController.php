@@ -17,13 +17,33 @@ class ProfileController extends Controller
         private ProfileService $profileService
     ) {}
 
-    public function show(Request $request): JsonResponse
-    {
+    public function show(Request $request, $username = null): JsonResponse
+{
+    if (!$username) {
         return response()->json([
             'message' => 'Profile retrieved successfully',
             'data'    => new UserResource($request->user()),
         ], 200);
     }
+
+    $user = User::withCount(['posts', 'followers', 'following'])
+                ->where('username', $username)
+                ->firstOrFail();
+
+    $isFollowing = false;
+    
+    if (Auth::check() && Auth::id() !== $user->id) {
+        $isFollowing = Follow::where('follower_id', Auth::id())
+                             ->where('following_id', $user->id)
+                             ->exists();
+    }
+
+    return response()->json([
+        'message' => 'Profile retrieved successfully',
+        'user'    => new UserResource($user),
+        'is_following' => $isFollowing
+    ], 200);
+}
 
     public function update(UpdateProfileRequest $request): JsonResponse
     {
@@ -55,33 +75,13 @@ class ProfileController extends Controller
         return response()->json($users);
     }
 
-    public function showUser($username)
-    {
-        $user = User::withCount(['posts', 'followers', 'following'])
-                    ->where('username', $username)
-                    ->firstOrFail();
-
-        $isFollowing = false;
-        
-        if (Auth::check()) {
-            $isFollowing = Follow::where('follower_id', Auth::id())
-                                 ->where('following_id', $user->id)
-                                 ->exists();
-        }
-
-        return response()->json([
-            'user' => $user,
-            'is_following' => $isFollowing
-        ]);
-    }
-
     public function toggleFollow($username)
     {
         $userToFollow = User::where('username', $username)->firstOrFail();
         $currentUser = Auth::user();
 
         if ($currentUser->id === $userToFollow->id) {
-            return response()->json(['message' => 'Você não pode seguir a si mesmo'], 400);
+            return response()->json(['message' => 'You cannot follow yourself '], 400);
         }
 
         $follow = Follow::where('follower_id', $currentUser->id)

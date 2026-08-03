@@ -1,7 +1,3 @@
-// Centralized HTTP client for the Gravityly API.
-// Every view shares this instead of hardcoding the API URL and repeating
-// the same fetch/error-handling boilerplate.
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const TOKEN_KEY = 'auth_token';
 
@@ -29,7 +25,6 @@ export class ApiError extends Error {
     this.errors = errors;
   }
 
-  /** Returns the first validation error message, falling back to the general message. */
   firstMessage() {
     if (this.errors) {
       const firstField = Object.values(this.errors)[0];
@@ -46,9 +41,7 @@ async function request(path, { method = 'GET', body = null, auth = true } = {}) 
   const isFormData = body instanceof FormData;
   let httpMethod = method;
 
-  // PHP does not parse multipart/form-data bodies on PUT/PATCH requests, so
-  // Laravel's documented workaround is to POST with a spoofed '_method'
-  // field. We do that transparently here so callers can just say PUT.
+ 
   if (isFormData && (method === 'PUT' || method === 'PATCH')) {
     body.append('_method', method);
     httpMethod = 'POST';

@@ -1,13 +1,16 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api, getToken } from '../services/api';
 
+const route = useRoute();
 const router = useRouter();
 
 const profileUser = ref(null); 
 const loading = ref(true);
 const errorMessage = ref(''); 
+const isFollowing = ref(false);
+const actionLoading = ref(false);
 
 const avatarUrl = computed(() => {
   let url = profileUser.value?.profile_photo_url;
@@ -19,32 +22,57 @@ const avatarUrl = computed(() => {
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
 });
 
-const fetchMyProfile = async () => {
+const fetchUserProfile = async () => {
   loading.value = true;
   errorMessage.value = '';
   
   try {
-    const { data } = await api.get('/me');
-    profileUser.value = data.data || data; 
+    const usernameURL = route.params.username;
+    
+    const response = await api.get(`/users/${usernameURL}`);    
+    const responseData = response.data || response;
+
+    profileUser.value = responseData.user || responseData;
+    isFollowing.value = responseData.is_following || false;
+    
   } catch (error) {
     console.error("Erro ao carregar o perfil", error);
-    errorMessage.value = 'Could not load your profile.';
+    errorMessage.value = 'User not found.';
   } finally {
     loading.value = false;
   }
 };
+
+watch(() => route.params.username, () => {
+  fetchUserProfile();
+});
 
 onMounted(async () => {
   if (!getToken()) {
     router.push('/login');
     return;
   }
-  await fetchMyProfile();
+  await fetchUserProfile();
 });
 
-const handleLogout = () => {
-  localStorage.removeItem('auth_token');
-  window.location.href = '/login'; 
+const handleFollowToggle = async () => {
+  if (actionLoading.value) return;
+  actionLoading.value = true;
+  
+  try {
+    const { data } = await api.post(`users/${profileUser.value.username}/follow`);
+    isFollowing.value = data.is_following;
+    
+    if (data.is_following) {
+      profileUser.value.followers_count++;
+    } else {
+      profileUser.value.followers_count--;
+    }
+  } catch (error) {
+    console.error("Erro ao seguir", error);
+  } finally {
+    actionLoading.value = false;
+  }
 };
 </script>
 
@@ -72,10 +100,14 @@ const handleLogout = () => {
           <div class="info-top">
             <h2 class="username">{{ profileUser.username }}</h2>
             
-            <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
-            <a href="#" @click.prevent="handleLogout" class="settings-icon" title="Log Out">
-              <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </a>
+            <button 
+              @click="handleFollowToggle" 
+              class="btn-edit" 
+              :class="{ 'btn-following': isFollowing }"
+              :disabled="actionLoading"
+            >
+              {{ actionLoading ? '...' : (isFollowing ? 'Following' : 'Follow') }}
+            </button>
           </div>
 
           <ul class="info-stats">
@@ -87,7 +119,7 @@ const handleLogout = () => {
           <div class="info-bio">
             <h1 class="fullname">{{ profileUser.name || profileUser.username }}</h1>
             <div class="bio-text">
-              {{ profileUser.bio || 'Add a bio in Edit Profile.' }}
+              {{ profileUser.bio }}
             </div>
           </div>
         </section>
@@ -95,7 +127,6 @@ const handleLogout = () => {
 
       <div class="profile-tabs">
         <a href="#" class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</a>
-        <a href="#" class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</a>
       </div>
 
       <div class="posts-grid">
@@ -121,8 +152,8 @@ const handleLogout = () => {
 .profile-info { flex: 2; display: flex; flex-direction: column; }
 .info-top { display: flex; align-items: center; margin-bottom: 20px; gap: 15px; }
 .username { font-size: 1.25rem; font-weight: 500; margin: 0; color: #C9C2E8; }
-.btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
-.settings-icon { color: #ff5d5d; font-size: 1.2rem; text-decoration: none; }
+.btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.1); }
+.btn-following { background-color: transparent; border: 1px solid #6F5CFF; color: #fff; }
 .info-stats { display: flex; list-style: none; padding: 0; margin: 0 0 20px 0; gap: 40px; }
 .stat-count { font-weight: bold; color: #FFC857; }
 .info-bio { font-size: 0.95rem; line-height: 1.5; }

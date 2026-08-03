@@ -68,7 +68,7 @@ class AuthController extends Controller
             'name'     => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
             'bio'      => ['nullable', 'string', 'max:1000'],
-            'avatar'   => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'], // Limite de 2MB
+            'avatar'   => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ]);
 
         $user->name = $validated['name'];

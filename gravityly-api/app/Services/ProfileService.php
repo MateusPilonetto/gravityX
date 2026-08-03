@@ -27,10 +27,6 @@ class ProfileService
         return Storage::disk('public')->url($path);
     }
 
-    /**
-     * Remove the previous avatar file from storage so replaced photos
-     * don't pile up as orphaned files on disk.
-     */
     private function deleteCurrentAvatar(User $user): void
     {
         if (! $user->profile_photo_url) {
