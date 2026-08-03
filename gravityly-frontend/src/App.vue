@@ -4,6 +4,9 @@ import { useRoute } from 'vue-router';
 import { userStore } from './store'; 
 import { useRouter } from 'vue-router';
 
+const loggedUsername = computed(() => {
+  return userStore.currentUser?.username || '';
+});
 
 const route = useRoute();
 const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
@@ -75,7 +78,7 @@ const handleLogout = () => {
             <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
           </router-link>        
           
-          <router-link to="/profile">
+          <router-link :to="`/profile/${loggedUsername}`">
             <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
           </router-link>    
         </nav>   

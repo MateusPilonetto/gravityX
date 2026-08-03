@@ -23,7 +23,7 @@ const routes = [
     component: RegisterView
   },
   {
-    path: '/profile',
+    path: '/profile:username(.*)',
     name: 'profile',
     component: ProfileView
   },

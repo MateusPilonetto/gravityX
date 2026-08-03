@@ -38,6 +38,11 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+
+  const urlUsername = route.params.username;
+
+  console.log('O username na URL é:', urlUsername);
+
 });
 
 const handleLogout = () => {
