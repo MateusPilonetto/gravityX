@@ -92,9 +92,9 @@ header {
   justify-content: space-between;
   align-items: center;
 
-  width: 100vw;
+  width: 99vw;
   
-  padding: 1rem 2rem;
+  padding: 1rem 1rem;
   box-sizing: border-box;
 }
 
@@ -124,8 +124,9 @@ header {
   justify-content: center;
   align-items: center;
   border-radius: 3rem;
-  width: 5rem;
-  height: 5rem;
+  width: 4rem;
+  height: 4rem;
+  margin: 5px;
   
   transition: all 0.3s ease; 
   cursor: pointer;

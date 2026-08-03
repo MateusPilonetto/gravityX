@@ -1,7 +1,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { userStore } from '../store'; 
+import { userStore } from '../store';
+
+const loggedUsername = computed(() => {
+  return userStore.currentUser?.username || '';
+});
 
 const router = useRouter();
 const error = ref('');
@@ -104,7 +108,7 @@ const handleSave = async () => {
       userStore.setCurrentUser(data.data); 
       
       successMessage.value = 'Profile updated successfully!';
-      setTimeout(() => router.push('/profile'), 1500);
+      setTimeout(() => router.push(`/profile/${loggedUsername.value}`), 1500);
     } else {
       error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
     }
@@ -122,7 +126,7 @@ const handleSave = async () => {
     <div class="glass-panel">
       
       <div class="edit-header">
-        <router-link to="/profile" class="back-btn">
+        <router-link :to="`/profile/${loggedUsername}`" class="back-btn">
           <i class="fa-solid fa-chevron-left"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>

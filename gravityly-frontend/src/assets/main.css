@@ -32,7 +32,7 @@ a:hover {
   color: #C9C2E8;
 }
 
-p, input, button, a {
+p, input, button, a, textarea, label {
   font-family: var(--font-body);
 }
 
