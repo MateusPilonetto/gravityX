@@ -19,6 +19,7 @@ COPY . .
 RUN composer dump-autoload --optimize \
     && mkdir -p database \
     && touch database/database.sqlite \
+    && php artisan storage:link \
     && php artisan config:cache \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database
 

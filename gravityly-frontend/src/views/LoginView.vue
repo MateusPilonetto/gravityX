@@ -1,17 +1,29 @@
 <script setup>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { api, setToken } from '../services/api';
 
+const router = useRouter();
 const error = ref('');
+const loading = ref(false);
 
-const fazerLogin = () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+const form = ref({
+  email: '',
+  password: ''
+});
 
-  if (email == "example@example" && password == "12345678") {
-    localStorage.setItem('usuario_logado', 'sim');
-    window.location.href = '/'; 
-  } else {
-    error.value = 'Error on login';
+const handleLogin = async () => {
+  error.value = '';
+  loading.value = true;
+
+  try {
+    const { data } = await api.post('/login', form.value, { auth: false });
+    setToken(data.token);
+    router.push('/');
+  } catch (err) {
+    error.value = err.firstMessage ? err.firstMessage() : err.message;
+  } finally {
+    loading.value = false;
   }
 };
 </script>
@@ -24,21 +36,28 @@ const fazerLogin = () => {
         <h1 class="login-title">Gravityly</h1>
         <h1 class="login-subtitle">Sign-in</h1>
       </div>
-
-      <p class="error">{{ error }}</p>
-
-      <form @submit.prevent="fazerLogin" class="login-form">
+      
+      <p class="error" v-if="error">{{ error }}</p>
+      
+      <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <input type="email" id="email" placeholder="Your e-mail or username" required class="input-field" />
+          <!-- Using v-model instead of ID -->
+          <input type="email" v-model="form.email" placeholder="Your e-mail" required class="input-field" />
         </div>
         
         <div class="input-group">
-          <input type="password" id="password" placeholder="Your password" required class="input-field" />
+          <input type="password" v-model="form.password" placeholder="Your password" required class="input-field" />
           <a href="#">Forgot Password?</a>
         </div>
         
-        <button type="submit" class="btn">Login</button>
-        <a type="submit" class="btn register">Create account</a>
+        <button type="submit" class="btn" :disabled="loading">
+          {{ loading ? 'Logging in...' : 'Login' }}
+        </button>
+        
+        <!-- Vue Router Link to Register Page -->
+        <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
+          Create account
+        </router-link>
       </form>
       
     </div>
@@ -47,8 +66,9 @@ const fazerLogin = () => {
 
 <style scoped>
 .error {
-  color: red;
+  color: #ff5d5d;
   text-align: center;
+  margin-bottom: 1rem;
 }
 
 .login-screen {
@@ -73,17 +93,17 @@ const fazerLogin = () => {
 
 .login-header {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .login-title {
-  color: #FFC857; 
+  color: #FFC857;
   margin: 0;
   font-size: 2.5rem;
 }
 
 .login-subtitle {
-  color: #C9C2E8; 
+  color: #C9C2E8;
   font-size: 1.5rem;
 }
 
@@ -107,7 +127,7 @@ const fazerLogin = () => {
 }
 
 .input-field:focus {
-  border-color: #6F5CFF; 
+  border-color: #6F5CFF;
 }
 
 .input-field::placeholder {
@@ -116,7 +136,7 @@ const fazerLogin = () => {
 
 .btn {
   margin-top: 0.3rem;
-  background-color: #6F5CFF; 
+  background-color: #6F5CFF;
   color: white;
   border: none;
   padding: 1rem;
@@ -129,11 +149,20 @@ const fazerLogin = () => {
 
 .register {
   text-align: center;
+  background-color: transparent;
+  border: 1px solid rgba(111, 92, 255, 0.3);
+  padding: 0.8rem;
 }
 
 .btn:hover {
   background-color: #C9C2E8;
   color: #211934;
-  transform: translateY(-2px); 
+  transform: translateY(-2px);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

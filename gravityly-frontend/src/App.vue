@@ -1,32 +1,58 @@
 <script setup>
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import { userStore } from './store'; 
+import { useRouter } from 'vue-router';
 
-import { ref, onMounted, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router'; 
-
-const route = useRoute(); 
-const router = useRouter();
-
-const isLoginPage = computed(() => route.path === '/login');
-
-onMounted(() => {
-  const temChave = localStorage.getItem('usuario_logado');
-
-  if (!temChave && route.path !== '/login') {
-    router.push('/login'); 
-  }
+const loggedUsername = computed(() => {
+  return userStore.currentUser?.username || '';
 });
 
+const route = useRoute();
+const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
+
+const user = computed(() => userStore.currentUser);
+
+const navAvatarUrl = computed(() => {
+  let url = user.value?.profile_photo_url;
+  
+  if (url) {
+    const match = url.match(/avatars\/([^/]+)$/);
+    if (match) {
+      return `http://localhost:8000/storage/avatars/${match[1]}`;
+    }
+  }
+  
+  const name = user.value?.name ? encodeURIComponent(user.value.name) : 'U';
+  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
+});
+
+const router = useRouter();
+
+const handleLogout = () => {
+  localStorage.removeItem('auth_token');
+  
+  router.push('/login');
+};
 </script>
 
 <template>
-    <header v-if="!isLoginPage">
+    <header v-if="!isAuthPage">
       <div class="logo-items">
         <img alt="Gravityly logo" class="logo" src="./assets/gravityly-logo-light.svg" width="125" height="125" />
         <h1 class="logo-title">Gravityly</h1>
       </div>
-      <div class="notifications-area glass-effect">
+      <section class="top-area">
+        <div class="buttons glass-effect">
         <i class="fa-solid fa-bell fa-2xl notification-icon"></i>
       </div>
+      <div class="glass-effect buttons">
+        <a href="#" @click.prevent="handleLogout" class="sua-classe-de-css-aqui">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </a>
+      </div>
+      </section>
+      
     </header>
 
 
@@ -34,14 +60,27 @@ onMounted(() => {
       <router-view />
     </main>
 
-     <div class="bottom-nav-wrapper" v-if="!isLoginPage">     
+     <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
         <nav class="bottom-nav">       
-          <i class="fa-solid fa-house nav-icon active"></i>        
-          <i class="fa-solid fa-magnifying-glass nav-icon"></i>        
-          <i class="fa-solid fa-square-plus nav-icon"></i>        
-          <i class="fa-solid fa-message nav-icon"></i>        
+          <router-link to="/" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-house nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>
+
+          <router-link to="/search" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-magnifying-glass nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
           
-          <img class="nav-profile-pic" loading="lazy" src="https://images.pexels.com/photos/30372403/pexels-photo-30372403.jpeg?auto=compress&cs=tinysrgb&w=400" alt="Profile photo">     
+          <router-link to="/post/create" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-square-plus nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
+          
+          <router-link to="/messages" custom v-slot="{ navigate, isActive }">
+            <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          </router-link>        
+          
+          <router-link :to="`/profile/${loggedUsername}`">
+            <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
+          </router-link>    
         </nav>   
       </div>
 </template>
@@ -53,10 +92,14 @@ header {
   justify-content: space-between;
   align-items: center;
 
-  width: 100vw;
+  width: 99vw;
   
-  padding: 1rem 2rem;
+  padding: 1rem 1rem;
   box-sizing: border-box;
+}
+
+.top-area {
+  display: flex;
 }
 
 .logo {
@@ -76,13 +119,14 @@ header {
   color: #FFC857;
 }
 
-.notifications-area {
+.buttons {
   display: flex;
   justify-content: center;
   align-items: center;
   border-radius: 3rem;
-  width: 5rem;
-  height: 5rem;
+  width: 4rem;
+  height: 4rem;
+  margin: 5px;
   
   transition: all 0.3s ease; 
   cursor: pointer;
@@ -141,7 +185,6 @@ header {
   transition: all 0.3s ease;
 }
 
-
 .nav-icon.active, 
 .nav-icon:hover {
   color: #C9C2E8; 
@@ -149,8 +192,8 @@ header {
 }
 
 .nav-profile-pic {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.2rem;
+  height: 2.2rem;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #FFC857;

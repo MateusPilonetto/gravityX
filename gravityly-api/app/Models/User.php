@@ -2,60 +2,80 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'username', 'email', 'password', 'bio', 'avatar',
+        'name',
+        'username',
+        'email',
+        'password',
+        'bio',
+        'profile_photo_url',
     ];
 
     protected $hidden = [
-        'password', 'remember_token',
+        'password',
+        'remember_token',
     ];
 
-    public function posts()
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    public function posts(): HasMany
     {
         return $this->hasMany(Post::class);
     }
 
-    public function comments()
+    public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
     }
 
-    public function likes()
+    public function likes(): HasMany
     {
         return $this->hasMany(Like::class);
     }
 
-    public function stories()
+    public function stories(): HasMany
     {
         return $this->hasMany(Story::class);
     }
 
-    // Usuários que EU sigo
-    public function following()
+    /**
+     * Users that this user follows.
+     */
+    public function following(): HasMany
     {
-        return $this->belongsToMany(User::class, 'follows', 'follower_id', 'following_id');
+        return $this->hasMany(Follow::class, 'follower_id');
     }
 
-    // Usuários que me seguem
-    public function followers()
+    /**
+     * Users that follow this user.
+     */
+    public function followers(): HasMany
     {
-        return $this->belongsToMany(User::class, 'follows', 'following_id', 'follower_id');
+        return $this->hasMany(Follow::class, 'following_id');
     }
 
-    public function sentMessages()
+    public function sentMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');
     }
 
-    public function receivedMessages()
+    public function receivedMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'receiver_id');
     }
