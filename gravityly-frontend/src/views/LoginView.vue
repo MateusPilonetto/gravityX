@@ -41,7 +41,6 @@ const handleLogin = async () => {
       
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <!-- Using v-model instead of ID -->
           <input type="email" v-model="form.email" placeholder="Your e-mail" required class="input-field" />
         </div>
         
@@ -54,7 +53,6 @@ const handleLogin = async () => {
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
         
-        <!-- Vue Router Link to Register Page -->
         <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
           Create account
         </router-link>

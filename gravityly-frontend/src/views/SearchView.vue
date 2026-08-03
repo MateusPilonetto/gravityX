@@ -5,62 +5,95 @@ import { api, setToken } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
+
+const searchQuery = ref('')
+const searchResult = ref([])
 const loading = ref(false);
 
+const search = async () => {
+    if(!searchQuery.value.trim()) return;
 
+    loading.value = true;
+
+    try {
+        const {data} = await api.get('/search', {
+            params: {
+                q: searchQuery.value
+            }
+        });
+        searchResults.value = data;
+    } 
+    catch (error) {
+        console.error("Error on search:", error);
+    } 
+    finally {
+        loading.value = false;
+    }
+}
 </script>
 
 <template>
-  <div class="home-container">
-    <div class="feed-header">
-      <h2><Search></Search></h2>
-    </div>
+  <div class="search-container">
+    <input 
+        class="glass-effect search-input" 
+        type="search"  
+        id="searchInput"
+        v-model="searchQuery"
+        @keyup.enter="search"
+        placeholder="Search">
     
-    <div class="welcome-card glass-effect">
-      <i class="fa-solid fa-search fa-2xl" style="color: #FFC857; margin-bottom: 20px;"></i>
-      <h3><Search></Search></h3>
-      <p>Soon will be avaliable</p>
-    </div>
+        <button @click="search" type="submit" class="search-button glass-effect">
+            <i class="fa-solid fa-search fa-2xl" style="color: #FFC857; margin-bottom: 20px;"></i>
+        </button>
   </div>
+
+  <div v-if="loading">Buscando...</div>
+  
+  <ul v-if="searchResults.length > 0">
+    <li v-for="user in searchResults" :key="user.id">
+      {{ user.username }}
+    </li>
+  </ul>
 </template>
 
 <style scoped>
-.home-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px 20px 100px 20px;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.search-container {
+    width: 100vw;
+    height: auto;
+
+    display: flex;
+    justify-content: center;
 }
 
-.feed-header h2 {
-  color: #C9C2E8;
-  font-size: 1.5rem;
-  margin: 0;
+.search-input {
+    width: 50vw;
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(111, 92, 255, 0.3);
+    background: rgba(3, 2, 4, 0.6);
+    color: white;
+    font-size: 1rem;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.3s ease;
 }
 
-.welcome-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 50px 20px;
-  border-radius: 16px;
-  background: rgba(33, 25, 52, 0.6);
-  border: 1px solid rgba(111, 92, 255, 0.3);
+.search-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 1.5rem;
+    width: 4rem;
+    height: 4rem;
+    padding-top: 1em;
+    margin-left: 1em;
+  
+    transition: all 0.3s ease; 
+    cursor: pointer;
 }
 
-.welcome-card h3 {
-  color: #fff;
-  margin-bottom: 10px;
-}
+.search-button:hover {
+      background: rgba(46, 46, 46, 0.25);
 
-.welcome-card p {
-  color: #a8a8a8;
-  font-size: 0.95rem;
-  max-width: 80%;
 }
 </style>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Models\User;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,6 +49,15 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Successfully logged out'
         ], 200);
+    }
+
+    public function search(Request $request) 
+    {
+        $term = $request->query('q'); 
+
+        $users = User::where('username', 'LIKE', '%' . $term . '%')->get();
+
+        return response()->json($users);
     }
 
     public function updateProfile(Request $request): \Illuminate\Http\JsonResponse
