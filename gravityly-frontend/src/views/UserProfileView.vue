@@ -1,58 +1,116 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import {
-  api,
-  clearToken,
-  getFallbackAvatarUrl,
-  getProfileAvatarUrl,
-} from '../services/api';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 import { userStore } from '../store';
 
+const route = useRoute();
 const router = useRouter();
 
 const profileUser = ref(null);
 const loading = ref(true);
 const errorMessage = ref('');
+const isFollowing = ref(false);
+const actionLoading = ref(false);
+const actionError = ref('');
+let activeRequestId = 0;
+
+const isOwnProfile = computed(() => {
+  return Boolean(
+    profileUser.value &&
+    userStore.currentUser &&
+    profileUser.value.id === userStore.currentUser.id
+  );
+});
 
 const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
 
-const loadProfile = async () => {
+const loadUserProfile = async () => {
+  const requestId = ++activeRequestId;
   loading.value = true;
   errorMessage.value = '';
-
+  
   try {
-    const responsePayload = await api.get('/me');
+    const username = route.params.username;
 
-    if (!responsePayload?.data || typeof responsePayload.data !== 'object') {
-      throw new Error('The server returned an invalid profile response.');
+    if (typeof username !== 'string' || !username) {
+      throw new Error('Missing profile username.');
+    }
+    
+    const responsePayload = await api.get(`/users/${encodeURIComponent(username)}`);
+
+    if (requestId !== activeRequestId) return;
+
+    if (!responsePayload.user || typeof responsePayload.user !== 'object' || !responsePayload.user.username) {
+      throw new Error('Profile response did not include a user.');
     }
 
-    profileUser.value = responsePayload.data;
+    profileUser.value = responsePayload.user;
+    isFollowing.value = Boolean(responsePayload.is_following);
+    
   } catch (errorResponse) {
+    if (requestId !== activeRequestId) return;
+
     if (errorResponse.status === 401) {
       return;
     }
 
-    console.error('Failed to load profile:', errorResponse);
-    errorMessage.value = 'Could not load profile.';
+    console.error('Failed to load user profile:', errorResponse);
+    profileUser.value = null;
+    errorMessage.value = errorResponse.status === 404
+      ? 'User not found.'
+      : 'Could not load profile.';
   } finally {
-    loading.value = false;
+    if (requestId === activeRequestId) {
+      loading.value = false;
+    }
   }
 };
 
+watch(() => route.params.username, () => {
+  void loadUserProfile();
+});
+
 onMounted(() => {
-  void loadProfile();
+  void loadUserProfile();
 });
 
 const handleAvatarError = (event) => {
   event.currentTarget.src = getFallbackAvatarUrl(profileUser.value, 256);
 };
 
-const handleLogout = () => {
-  clearToken();
-  userStore.clearUser();
-  router.replace('/login');
+const handleFollowToggle = async () => {
+  if (isOwnProfile.value || actionLoading.value) return;
+  actionLoading.value = true;
+  actionError.value = '';
+  
+  try {
+    const path = `/users/${encodeURIComponent(profileUser.value.username)}/follow`;
+    const responsePayload = isFollowing.value
+      ? await api.delete(path)
+      : await api.post(path);
+
+    isFollowing.value = Boolean(responsePayload.is_following);
+
+    if (typeof responsePayload.followers_count === 'number') {
+      profileUser.value.followers_count = responsePayload.followers_count;
+    }
+
+    if (typeof responsePayload.viewer_following_count === 'number' && userStore.currentUser) {
+      userStore.currentUser.following_count = responsePayload.viewer_following_count;
+    }
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
+      return;
+    }
+
+    console.error('Failed to update follow status:', errorResponse);
+    actionError.value = errorResponse.firstMessage
+      ? errorResponse.firstMessage()
+      : errorResponse.message;
+  } finally {
+    actionLoading.value = false;
+  }
 };
 </script>
 
@@ -80,11 +138,20 @@ const handleLogout = () => {
           <div class="info-top">
             <h2 class="username">{{ profileUser.username }}</h2>
             
-            <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
-            <button type="button" @click="handleLogout" class="settings-icon" title="Log out" aria-label="Log out">
-              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <router-link v-if="isOwnProfile" to="/profile/edit" class="btn-edit">
+              Edit profile
+            </router-link>
+            <button 
+              v-else
+              @click="handleFollowToggle" 
+              class="btn-edit" 
+              :class="{ 'btn-following': isFollowing }"
+              :disabled="actionLoading"
+            >
+              {{ actionLoading ? '...' : (isFollowing ? 'Following' : 'Follow') }}
             </button>
           </div>
+          <p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
 
           <ul class="info-stats">
             <li><span class="stat-count">{{ profileUser.posts_count || 0 }}</span> posts</li>
@@ -95,7 +162,7 @@ const handleLogout = () => {
           <div class="info-bio">
             <h1 class="fullname">{{ profileUser.name || profileUser.username }}</h1>
             <div class="bio-text">
-              {{ profileUser.bio || 'Add a bio in Edit Profile.' }}
+              {{ profileUser.bio || 'No bio yet.' }}
             </div>
           </div>
         </section>
@@ -103,7 +170,6 @@ const handleLogout = () => {
 
       <div class="profile-tabs">
         <span class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</span>
-        <span class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</span>
       </div>
 
       <div class="posts-grid">
@@ -129,8 +195,9 @@ const handleLogout = () => {
 .profile-info { flex: 2; display: flex; flex-direction: column; }
 .info-top { display: flex; align-items: center; margin-bottom: 20px; gap: 15px; }
 .username { font-size: 1.25rem; font-weight: 500; margin: 0; color: #C9C2E8; }
-.btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
-.settings-icon { color: #ff5d5d; font-size: 1.2rem; background: transparent; border: 0; cursor: pointer; }
+.btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.1); }
+.btn-following { background-color: transparent; border: 1px solid #6F5CFF; color: #fff; }
+.action-error { color: #ff8b8b; font-size: 0.85rem; margin: -12px 0 12px; }
 .info-stats { display: flex; list-style: none; padding: 0; margin: 0 0 20px 0; gap: 40px; }
 .stat-count { font-weight: bold; color: #FFC857; }
 .info-bio { font-size: 0.95rem; line-height: 1.5; }

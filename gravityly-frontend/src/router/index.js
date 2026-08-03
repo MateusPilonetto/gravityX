@@ -1,72 +1,96 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import EditProfileView from '../views/EditProfileView.vue'
-import { isAuthenticated } from '../services/api'
-import SearchView from '@/views/SearchView.vue'
-import MessagesView from '@/views/MessagesView.vue'
-import CreatePostView from '@/views/CreatePostView.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '../views/HomeView.vue';
+import LoginView from '../views/LoginView.vue';
+import RegisterView from '../views/RegisterView.vue';
+import ProfileView from '../views/ProfileView.vue';
+import UserProfileView from '../views/UserProfileView.vue';
+import EditProfileView from '../views/EditProfileView.vue';
+import NotFoundView from '../views/NotFoundView.vue';
+import SearchView from '../views/SearchView.vue';
+import MessagesView from '../views/MessagesView.vue';
+import CreatePostView from '../views/CreatePostView.vue';
+import { isAuthenticated } from '../services/api';
 
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: HomeView
+    component: HomeView,
+    meta: { requiresAuth: true },
   },
   {
     path: '/login',
     name: 'login',
-    component: LoginView
+    component: LoginView,
+    meta: { guestOnly: true },
   },
   {
     path: '/register',
     name: 'register',
-    component: RegisterView
+    component: RegisterView,
+    meta: { guestOnly: true },
   },
   {
-    path: '/profile:username(.*)',
+    path: '/profile',
     name: 'profile',
-    component: ProfileView
+    component: ProfileView,
+    meta: { requiresAuth: true },
   },
   {
     path: '/profile/edit',
     name: 'edit-profile',
-    component: EditProfileView
+    component: EditProfileView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/profile/:username',
+    name: 'user-profile',
+    component: UserProfileView,
+    meta: { requiresAuth: true },
   },
   {
     path: '/search',
     name: 'search',
-    component: SearchView
+    component: SearchView,
+    meta: { requiresAuth: true },
   },
   {
     path: '/messages',
-    name: 'Message',
-    component: MessagesView
+    name: 'messages',
+    component: MessagesView,
+    meta: { requiresAuth: true },
   },
   {
     path: '/post/create',
     name: 'create-post',
-    component: CreatePostView
-  }
-]
+    component: CreatePostView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundView,
+  },
+];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
-})
-
-router.beforeEach((to, from, next) => {
-  const isAuthPage = ['/login', '/register'].includes(to.path);
-
-  if (!isAuthenticated() && !isAuthPage) {
-    next('/login');
-  } else if (isAuthenticated() && isAuthPage) {
-    next('/');
-  } else {
-    next();
-  }
+  routes,
 });
 
-export default router
+router.beforeEach((destinationRoute) => {
+  if (destinationRoute.meta.guestOnly && isAuthenticated()) {
+    return { name: 'home' };
+  }
+
+  if (destinationRoute.meta.requiresAuth && !isAuthenticated()) {
+    return {
+      name: 'login',
+      query: { redirect: destinationRoute.fullPath },
+    };
+  }
+
+  return true;
+});
+
+export default router;

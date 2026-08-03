@@ -1,11 +1,8 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { userStore } from '../store';
-
-const loggedUsername = computed(() => {
-  return userStore.currentUser?.username || '';
-});
+import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
@@ -15,6 +12,7 @@ const loading = ref(false);
 const fileInput = ref(null);
 const selectedFile = ref(null);
 const previewUrl = ref(null);
+let redirectTimer = null;
 
 const form = ref({
   name: '',
@@ -25,60 +23,69 @@ const form = ref({
 
 const displayAvatar = computed(() => {
   if (previewUrl.value) return previewUrl.value;
-  
-  let url = form.value?.profile_photo_url;
-  
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) {
-      return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
-  }
-  
-  const name = form.value?.name ? encodeURIComponent(form.value.name) : 'U';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=150&bold=true`;
+
+  return getProfileAvatarUrl(form.value);
 });
 
-onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
-  try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const userData = data.data ? data.data : data;
-      form.value.name = userData.name;
-      form.value.username = userData.username;
-      form.value.bio = userData.bio || '';
-      form.value.profile_photo_url = userData.profile_photo_url || '';
-    }
-  } catch (err) {
-    console.error(err);
+const revokePreviewUrl = () => {
+  if (previewUrl.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value);
   }
+
+  previewUrl.value = null;
+};
+
+const loadProfile = async () => {
+  try {
+    const responsePayload = await api.get('/me');
+    const userProfile = responsePayload?.data;
+
+    if (!userProfile || typeof userProfile !== 'object') {
+      throw new Error('The server returned an invalid profile response.');
+    }
+
+    form.value.name = userProfile.name;
+    form.value.username = userProfile.username;
+    form.value.bio = userProfile.bio || '';
+    form.value.profile_photo_url = userProfile.profile_photo_url || '';
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
+      return;
+    }
+
+    console.error('Failed to load profile:', errorResponse);
+    error.value = errorResponse.firstMessage ? errorResponse.firstMessage() : errorResponse.message;
+  }
+};
+
+onMounted(() => {
+  void loadProfile();
 });
 
 const triggerFileInput = () => {
-  fileInput.value.click();
+  fileInput.value?.click();
 };
 
 const onFileChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    selectedFile.value = file;
-    previewUrl.value = URL.createObjectURL(file);
+  const selectedImage = event.target.files?.[0];
+
+  if (selectedImage) {
+    revokePreviewUrl();
+    selectedFile.value = selectedImage;
+    previewUrl.value = URL.createObjectURL(selectedImage);
   }
+};
+
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(form.value, 200);
 };
 
 const handleSave = async () => {
   error.value = '';
   successMessage.value = '';
   loading.value = true;
-  const token = localStorage.getItem('auth_token');
 
   const formData = new FormData();
-  formData.append('_method', 'PUT');
   formData.append('name', form.value.name);
   formData.append('username', form.value.username);
   formData.append('bio', form.value.bio || '');
@@ -88,37 +95,39 @@ const handleSave = async () => {
   }
 
   try {
-    const response = await fetch('http://localhost:8000/api/me', {
-      method: 'POST', 
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
-      body: formData
-    });
+    const responsePayload = await api.put('/me', formData);
+    const updatedUser = responsePayload?.data;
 
-    let data;
-    try {
-        data = await response.json();
-    } catch (parseError) {
-        throw new Error("O backend não devolveu um JSON. O servidor pode estar fora do ar.");
+    if (!updatedUser || typeof updatedUser !== 'object') {
+      throw new Error('The server returned an invalid profile response.');
     }
 
-    if (response.ok) {
-      userStore.setCurrentUser(data.data); 
-      
-      successMessage.value = 'Profile updated successfully!';
-      setTimeout(() => router.push(`/profile/${loggedUsername.value}`), 1500);
-    } else {
-      error.value = data.errors ? Object.values(data.errors)[0][0] : data.message;
+    userStore.setCurrentUser(updatedUser);
+    form.value.profile_photo_url = updatedUser.profile_photo_url || '';
+    selectedFile.value = null;
+    revokePreviewUrl();
+
+    successMessage.value = 'Profile updated successfully!';
+    redirectTimer = window.setTimeout(() => router.push('/profile'), 1500);
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
+      return;
     }
-  } catch (err) {
-    console.error("Error", err);
-    error.value = 'Error ' + err.message;
+
+    console.error('Failed to update profile:', errorResponse);
+    error.value = errorResponse.firstMessage ? errorResponse.firstMessage() : errorResponse.message;
   } finally {
     loading.value = false;
   }
 };
+
+onBeforeUnmount(() => {
+  revokePreviewUrl();
+
+  if (redirectTimer !== null) {
+    window.clearTimeout(redirectTimer);
+  }
+});
 </script>
 
 <template>
@@ -126,7 +135,7 @@ const handleSave = async () => {
     <div class="glass-panel">
       
       <div class="edit-header">
-        <router-link :to="`/profile/${loggedUsername}`" class="back-btn">
+        <router-link to="/profile" class="back-btn">
           <i class="fa-solid fa-chevron-left"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>
@@ -135,7 +144,7 @@ const handleSave = async () => {
 
       <div class="avatar-section">
         <div class="avatar-wrapper" @click="triggerFileInput">
-          <img class="avatar-preview" :src="displayAvatar" alt="Profile Avatar" />
+          <img class="avatar-preview" :src="displayAvatar" alt="Profile avatar" @error="handleAvatarError" />
           <div class="avatar-overlay">
             <i class="fa-solid fa-camera"></i>
           </div>

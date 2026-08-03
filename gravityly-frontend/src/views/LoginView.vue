@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { api, setToken } from '../services/api';
 
 const router = useRouter();
+const route = useRoute();
 const error = ref('');
 const loading = ref(false);
 
@@ -17,11 +18,19 @@ const handleLogin = async () => {
   loading.value = true;
 
   try {
-    const { data } = await api.post('/login', form.value, { auth: false });
-    setToken(data.token);
-    router.push('/');
-  } catch (err) {
-    error.value = err.firstMessage ? err.firstMessage() : err.message;
+    const responsePayload = await api.post('/login', form.value, { auth: false });
+    setToken(responsePayload.data.token);
+
+    const redirectPath = route.query.redirect;
+    const destination = typeof redirectPath === 'string' && redirectPath.startsWith('/')
+      ? redirectPath
+      : '/';
+
+    router.push(destination);
+  } catch (errorResponse) {
+    error.value = errorResponse.firstMessage
+      ? errorResponse.firstMessage()
+      : errorResponse.message;
   } finally {
     loading.value = false;
   }
@@ -41,20 +50,18 @@ const handleLogin = async () => {
       
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <!-- Using v-model instead of ID -->
           <input type="email" v-model="form.email" placeholder="Your e-mail" required class="input-field" />
         </div>
         
         <div class="input-group">
           <input type="password" v-model="form.password" placeholder="Your password" required class="input-field" />
-          <a href="#">Forgot Password?</a>
+          <span class="password-help">Password recovery is not available yet.</span>
         </div>
         
         <button type="submit" class="btn" :disabled="loading">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
         
-        <!-- Vue Router Link to Register Page -->
         <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
           Create account
         </router-link>
@@ -132,6 +139,11 @@ const handleLogin = async () => {
 
 .input-field::placeholder {
   color: rgba(201, 194, 232, 0.6);
+}
+
+.password-help {
+  color: #a8a8a8;
+  font-size: 0.8rem;
 }
 
 .btn {

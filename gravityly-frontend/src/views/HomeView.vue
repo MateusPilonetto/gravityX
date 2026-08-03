@@ -1,17 +1,3 @@
-<script setup>
-import { onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { isAuthenticated } from '../services/api';
-
-const router = useRouter();
-
-onMounted(() => {
-  if (!isAuthenticated()) {
-    router.push('/login');
-  }
-});
-</script>
-
 <template>
   <div class="home-container">
     <div class="feed-header">

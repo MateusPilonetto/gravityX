@@ -1,43 +1,88 @@
 <script setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-import { userStore } from './store'; 
-import { useRouter } from 'vue-router';
-
-const loggedUsername = computed(() => {
-  return userStore.currentUser?.username || '';
-});
+import { computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { userStore } from './store';
+import {
+  api,
+  clearToken,
+  getFallbackAvatarUrl,
+  getProfileAvatarUrl,
+  getToken,
+  setUnauthorizedResponseHandler,
+} from './services/api';
 
 const route = useRoute();
-const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
-
-const user = computed(() => userStore.currentUser);
-
-const navAvatarUrl = computed(() => {
-  let url = user.value?.profile_photo_url;
-  
-  if (url) {
-    const match = url.match(/avatars\/([^/]+)$/);
-    if (match) {
-      return `http://localhost:8000/storage/avatars/${match[1]}`;
-    }
-  }
-  
-  const name = user.value?.name ? encodeURIComponent(user.value.name) : 'U';
-  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=50&bold=true`;
-});
-
 const router = useRouter();
 
+const isGuestPage = computed(() => Boolean(route.meta.guestOnly));
+const showApplicationChrome = computed(() => Boolean(route.meta.requiresAuth));
+
+const navAvatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 50));
+
+let activeSessionRequest = 0;
+
+const redirectToLogin = () => {
+  clearToken();
+  userStore.clearUser();
+
+  if (!isGuestPage.value) {
+    router.replace('/login');
+  }
+};
+
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(userStore.currentUser, 50);
+};
+
+setUnauthorizedResponseHandler(redirectToLogin);
+
+const loadCurrentUser = async () => {
+  const requestId = ++activeSessionRequest;
+
+  if (!getToken()) {
+    redirectToLogin();
+    return;
+  }
+
+  try {
+    const responsePayload = await api.get('/me');
+
+    if (requestId === activeSessionRequest) {
+      userStore.setCurrentUser(responsePayload.data);
+    }
+  } catch (errorResponse) {
+    if (requestId !== activeSessionRequest) return;
+
+    if (errorResponse.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    console.error('Failed to load the current session:', errorResponse);
+  }
+};
+
+watch(() => route.path, () => {
+  if (!route.meta.requiresAuth) {
+    activeSessionRequest++;
+
+    if (isGuestPage.value) {
+      userStore.clearUser();
+    }
+
+    return;
+  }
+
+  void loadCurrentUser();
+}, { immediate: true });
+
 const handleLogout = () => {
-  localStorage.removeItem('auth_token');
-  
-  router.push('/login');
+  redirectToLogin();
 };
 </script>
 
 <template>
-    <header v-if="!isAuthPage">
+    <header v-if="showApplicationChrome">
       <div class="logo-items">
         <img alt="Gravityly logo" class="logo" src="./assets/gravityly-logo-light.svg" width="125" height="125" />
         <h1 class="logo-title">Gravityly</h1>
@@ -47,9 +92,9 @@ const handleLogout = () => {
         <i class="fa-solid fa-bell fa-2xl notification-icon"></i>
       </div>
       <div class="glass-effect buttons">
-        <a href="#" @click.prevent="handleLogout" class="sua-classe-de-css-aqui">
+        <button type="button" @click="handleLogout" class="logout-button" aria-label="Log out">
           <i class="fa-solid fa-arrow-right-from-bracket"></i>
-        </a>
+        </button>
       </div>
       </section>
       
@@ -60,26 +105,32 @@ const handleLogout = () => {
       <router-view />
     </main>
 
-     <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
+     <div class="bottom-nav-wrapper" v-if="showApplicationChrome">
         <nav class="bottom-nav">       
-          <router-link to="/" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-house nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/" class="nav-link">
+            <i class="fa-solid fa-house nav-icon"></i>
           </router-link>
 
-          <router-link to="/search" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-magnifying-glass nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/search" class="nav-link">
+            <i class="fa-solid fa-magnifying-glass nav-icon"></i>
           </router-link>        
           
-          <router-link to="/post/create" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-square-plus nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/post/create" class="nav-link">
+            <i class="fa-solid fa-square-plus nav-icon"></i>
           </router-link>        
           
-          <router-link to="/messages" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/messages" class="nav-link">
+            <i class="fa-solid fa-message nav-icon"></i>
           </router-link>        
           
-          <router-link :to="`/profile/${loggedUsername}`">
-            <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
+          <router-link to="/profile" class="nav-link">
+            <img
+              class="nav-profile-pic"
+              loading="lazy"
+              :src="navAvatarUrl"
+              alt="Profile photo"
+              @error="handleAvatarError"
+            >
           </router-link>    
         </nav>   
       </div>
@@ -130,6 +181,15 @@ header {
   
   transition: all 0.3s ease; 
   cursor: pointer;
+}
+
+.logout-button {
+  display: flex;
+  color: #ff5d5d;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.25rem;
 }
 
 .notifications-area:hover {
@@ -185,10 +245,14 @@ header {
   transition: all 0.3s ease;
 }
 
-.nav-icon.active, 
+.nav-link.router-link-active .nav-icon,
 .nav-icon:hover {
   color: #C9C2E8; 
   transform: translateY(-2px); 
+}
+
+.nav-link {
+  display: flex;
 }
 
 .nav-profile-pic {

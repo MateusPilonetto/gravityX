@@ -1,9 +1,6 @@
-// Centralized HTTP client for the Gravityly API.
-// Every view shares this instead of hardcoding the API URL and repeating
-// the same fetch/error-handling boilerplate.
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const TOKEN_KEY = 'auth_token';
+let unauthorizedResponseHandler = null;
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -21,6 +18,42 @@ export function isAuthenticated() {
   return Boolean(getToken());
 }
 
+export function setUnauthorizedResponseHandler(handler) {
+  unauthorizedResponseHandler = handler;
+}
+
+export function getFallbackAvatarUrl(user, size = 150) {
+  const name = encodeURIComponent(user?.name || user?.username || 'User');
+  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=${size}&bold=true`;
+}
+
+export function getProfileAvatarUrl(user, size = 150) {
+  const profilePhotoUrl = user?.profile_photo_url;
+  const fallbackUrl = getFallbackAvatarUrl(user, size);
+
+  if (!profilePhotoUrl) {
+    return fallbackUrl;
+  }
+
+  try {
+    const apiOrigin = new URL(API_BASE_URL, window.location.origin).origin;
+    const photoUrl = new URL(profilePhotoUrl, apiOrigin);
+    const path = photoUrl.pathname.replace(/^\/+/, '');
+
+    if (path.startsWith('storage/')) {
+      return `${apiOrigin}/${path}${photoUrl.search}${photoUrl.hash}`;
+    }
+
+    if (path.startsWith('avatars/')) {
+      return `${apiOrigin}/storage/${path}${photoUrl.search}${photoUrl.hash}`;
+    }
+
+    return photoUrl.href;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 export class ApiError extends Error {
   constructor(message, status, errors = null) {
     super(message);
@@ -29,7 +62,6 @@ export class ApiError extends Error {
     this.errors = errors;
   }
 
-  /** Returns the first validation error message, falling back to the general message. */
   firstMessage() {
     if (this.errors) {
       const firstField = Object.values(this.errors)[0];
@@ -46,9 +78,7 @@ async function request(path, { method = 'GET', body = null, auth = true } = {}) 
   const isFormData = body instanceof FormData;
   let httpMethod = method;
 
-  // PHP does not parse multipart/form-data bodies on PUT/PATCH requests, so
-  // Laravel's documented workaround is to POST with a spoofed '_method'
-  // field. We do that transparently here so callers can just say PUT.
+ 
   if (isFormData && (method === 'PUT' || method === 'PATCH')) {
     body.append('_method', method);
     httpMethod = 'POST';
@@ -76,17 +106,29 @@ async function request(path, { method = 'GET', body = null, auth = true } = {}) 
     throw new ApiError('Failed to connect to the server.', 0);
   }
 
-  const data = await response.json().catch(() => ({}));
+  const responsePayload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new ApiError(data.message || 'Something went wrong.', response.status, data.errors);
+    const error = new ApiError(
+      responsePayload.message || 'Something went wrong.',
+      response.status,
+      responsePayload.errors,
+    );
+
+    if (response.status === 401) {
+      clearToken();
+      unauthorizedResponseHandler?.();
+    }
+
+    throw error;
   }
 
-  return data;
+  return responsePayload;
 }
 
 export const api = {
   get: (path, options = {}) => request(path, { method: 'GET', ...options }),
   post: (path, body, options = {}) => request(path, { method: 'POST', body, ...options }),
   put: (path, body, options = {}) => request(path, { method: 'PUT', body, ...options }),
+  delete: (path, options = {}) => request(path, { method: 'DELETE', ...options }),
 };

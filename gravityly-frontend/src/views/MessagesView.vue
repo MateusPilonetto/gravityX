@@ -1,25 +1,13 @@
-<script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { api, setToken } from '../services/api';
-
-const router = useRouter();
-const error = ref('');
-const loading = ref(false);
-
-
-</script>
-
 <template>
   <div class="home-container">
     <div class="feed-header">
-      <h2><Search></Search></h2>
+      <h2>Messages</h2>
     </div>
     
     <div class="welcome-card glass-effect">
       <i class="fa-solid fa-message fa-2xl" style="color: #FFC857; margin-bottom: 20px;"></i>
-      <h3><Search></Search></h3>
-      <p>Soon will be avaliable</p>
+      <h3>Messaging is coming soon</h3>
+      <p>You will be able to start conversations from this page.</p>
     </div>
   </div>
 </template>

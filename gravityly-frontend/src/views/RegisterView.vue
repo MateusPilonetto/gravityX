@@ -20,11 +20,13 @@ const handleRegister = async () => {
   loading.value = true;
 
   try {
-    const { data } = await api.post('/register', form.value, { auth: false });
-    setToken(data.token);
+    const responsePayload = await api.post('/register', form.value, { auth: false });
+    setToken(responsePayload.data.token);
     router.push('/');
-  } catch (err) {
-    error.value = err.firstMessage ? err.firstMessage() : err.message;
+  } catch (errorResponse) {
+    error.value = errorResponse.firstMessage
+      ? errorResponse.firstMessage()
+      : errorResponse.message;
   } finally {
     loading.value = false;
   }

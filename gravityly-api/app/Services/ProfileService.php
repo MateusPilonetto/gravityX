@@ -8,14 +8,20 @@ use Illuminate\Support\Facades\Storage;
 
 class ProfileService
 {
-    public function update(User $user, array $data, ?UploadedFile $avatar = null): User
+    public function update(User $user, array $attributes, ?UploadedFile $avatar = null): User
     {
-        if ($avatar) {
-            $this->deleteCurrentAvatar($user);
-            $data['profile_photo_url'] = $this->storeAvatar($avatar);
+        $previousAvatarUrl = $user->profile_photo_url;
+        unset($attributes['avatar']);
+
+        if ($avatar !== null) {
+            $attributes['profile_photo_url'] = $this->storeAvatar($avatar);
         }
 
-        $user->update($data);
+        $user->update($attributes);
+
+        if ($avatar !== null && $previousAvatarUrl !== null) {
+            $this->deleteAvatar($previousAvatarUrl);
+        }
 
         return $user;
     }
@@ -24,23 +30,23 @@ class ProfileService
     {
         $path = $avatar->store('avatars', 'public');
 
-        return Storage::disk('public')->url($path);
+        return '/storage/'.$path;
     }
 
-    /**
-     * Remove the previous avatar file from storage so replaced photos
-     * don't pile up as orphaned files on disk.
-     */
-    private function deleteCurrentAvatar(User $user): void
+    private function deleteAvatar(string $profilePhotoUrl): void
     {
-        if (! $user->profile_photo_url) {
-            return;
+        $urlPath = parse_url($profilePhotoUrl, PHP_URL_PATH);
+        $currentPath = is_string($urlPath) ? $urlPath : $profilePhotoUrl;
+        $currentPath = ltrim($currentPath, '/');
+
+        $publicUrlPath = parse_url(Storage::disk('public')->url(''), PHP_URL_PATH) ?? '/storage';
+        $publicUrlPath = trim($publicUrlPath, '/');
+
+        if (str_starts_with($currentPath, $publicUrlPath.'/')) {
+            $currentPath = substr($currentPath, strlen($publicUrlPath) + 1);
         }
 
-        $publicUrlPrefix = Storage::disk('public')->url('');
-        $currentPath = str_replace($publicUrlPrefix, '', $user->profile_photo_url);
-
-        if ($currentPath && Storage::disk('public')->exists($currentPath)) {
+        if (str_starts_with($currentPath, 'avatars/') && Storage::disk('public')->exists($currentPath)) {
             Storage::disk('public')->delete($currentPath);
         }
     }
