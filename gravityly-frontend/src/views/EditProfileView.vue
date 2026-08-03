@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { userStore } from '../store';
-import { api, clearToken, getProfileAvatarUrl } from '../services/api';
+import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 
 const router = useRouter();
 const error = ref('');
@@ -12,6 +12,7 @@ const loading = ref(false);
 const fileInput = ref(null);
 const selectedFile = ref(null);
 const previewUrl = ref(null);
+let redirectTimer = null;
 
 const form = ref({
   name: '',
@@ -26,29 +27,34 @@ const displayAvatar = computed(() => {
   return getProfileAvatarUrl(form.value);
 });
 
-const redirectToLogin = () => {
-  clearToken();
-  userStore.clearUser();
-  router.replace('/login');
+const revokePreviewUrl = () => {
+  if (previewUrl.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value);
+  }
+
+  previewUrl.value = null;
 };
 
 const loadProfile = async () => {
   try {
-    const response = await api.get('/me');
-    const userData = response.data;
+    const responsePayload = await api.get('/me');
+    const userProfile = responsePayload?.data;
 
-    form.value.name = userData.name;
-    form.value.username = userData.username;
-    form.value.bio = userData.bio || '';
-    form.value.profile_photo_url = userData.profile_photo_url || '';
-  } catch (err) {
-    if (err.status === 401) {
-      redirectToLogin();
+    if (!userProfile || typeof userProfile !== 'object') {
+      throw new Error('The server returned an invalid profile response.');
+    }
+
+    form.value.name = userProfile.name;
+    form.value.username = userProfile.username;
+    form.value.bio = userProfile.bio || '';
+    form.value.profile_photo_url = userProfile.profile_photo_url || '';
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
       return;
     }
 
-    console.error('Erro ao carregar o perfil', err);
-    error.value = err.firstMessage ? err.firstMessage() : err.message;
+    console.error('Failed to load profile:', errorResponse);
+    error.value = errorResponse.firstMessage ? errorResponse.firstMessage() : errorResponse.message;
   }
 };
 
@@ -57,15 +63,21 @@ onMounted(() => {
 });
 
 const triggerFileInput = () => {
-  fileInput.value.click();
+  fileInput.value?.click();
 };
 
 const onFileChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    selectedFile.value = file;
-    previewUrl.value = URL.createObjectURL(file);
+  const selectedImage = event.target.files?.[0];
+
+  if (selectedImage) {
+    revokePreviewUrl();
+    selectedFile.value = selectedImage;
+    previewUrl.value = URL.createObjectURL(selectedImage);
   }
+};
+
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(form.value, 200);
 };
 
 const handleSave = async () => {
@@ -83,25 +95,39 @@ const handleSave = async () => {
   }
 
   try {
-    const data = await api.put('/me', formData);
-    userStore.setCurrentUser(data.data);
-    form.value.profile_photo_url = data.data.profile_photo_url || '';
-    previewUrl.value = null;
+    const responsePayload = await api.put('/me', formData);
+    const updatedUser = responsePayload?.data;
+
+    if (!updatedUser || typeof updatedUser !== 'object') {
+      throw new Error('The server returned an invalid profile response.');
+    }
+
+    userStore.setCurrentUser(updatedUser);
+    form.value.profile_photo_url = updatedUser.profile_photo_url || '';
+    selectedFile.value = null;
+    revokePreviewUrl();
 
     successMessage.value = 'Profile updated successfully!';
-    setTimeout(() => router.push('/profile'), 1500);
-  } catch (err) {
-    if (err.status === 401) {
-      redirectToLogin();
+    redirectTimer = window.setTimeout(() => router.push('/profile'), 1500);
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
       return;
     }
 
-    console.error('Erro ao atualizar perfil', err);
-    error.value = err.firstMessage ? err.firstMessage() : err.message;
+    console.error('Failed to update profile:', errorResponse);
+    error.value = errorResponse.firstMessage ? errorResponse.firstMessage() : errorResponse.message;
   } finally {
     loading.value = false;
   }
 };
+
+onBeforeUnmount(() => {
+  revokePreviewUrl();
+
+  if (redirectTimer !== null) {
+    window.clearTimeout(redirectTimer);
+  }
+});
 </script>
 
 <template>
@@ -118,7 +144,7 @@ const handleSave = async () => {
 
       <div class="avatar-section">
         <div class="avatar-wrapper" @click="triggerFileInput">
-          <img class="avatar-preview" :src="displayAvatar" alt="Profile Avatar" />
+          <img class="avatar-preview" :src="displayAvatar" alt="Profile avatar" @error="handleAvatarError" />
           <div class="avatar-overlay">
             <i class="fa-solid fa-camera"></i>
           </div>

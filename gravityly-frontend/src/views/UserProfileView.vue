@@ -1,19 +1,19 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, clearToken, getProfileAvatarUrl, getToken } from '../services/api';
+import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 import { userStore } from '../store';
 
 const route = useRoute();
 const router = useRouter();
 
-const profileUser = ref(null); 
+const profileUser = ref(null);
 const loading = ref(true);
-const errorMessage = ref(''); 
+const errorMessage = ref('');
 const isFollowing = ref(false);
 const actionLoading = ref(false);
 const actionError = ref('');
-let activeRequest = 0;
+let activeRequestId = 0;
 
 const isOwnProfile = computed(() => {
   return Boolean(
@@ -25,14 +25,8 @@ const isOwnProfile = computed(() => {
 
 const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
 
-const redirectToLogin = () => {
-  clearToken();
-  userStore.clearUser();
-  router.replace('/login');
-};
-
-const fetchUserProfile = async () => {
-  const requestId = ++activeRequest;
+const loadUserProfile = async () => {
+  const requestId = ++activeRequestId;
   loading.value = true;
   errorMessage.value = '';
   
@@ -43,48 +37,47 @@ const fetchUserProfile = async () => {
       throw new Error('Missing profile username.');
     }
     
-    const response = await api.get(`/users/${encodeURIComponent(username)}`);
+    const responsePayload = await api.get(`/users/${encodeURIComponent(username)}`);
 
-    if (requestId !== activeRequest) return;
+    if (requestId !== activeRequestId) return;
 
-    if (!response.user || typeof response.user !== 'object' || !response.user.username) {
+    if (!responsePayload.user || typeof responsePayload.user !== 'object' || !responsePayload.user.username) {
       throw new Error('Profile response did not include a user.');
     }
 
-    profileUser.value = response.user;
-    isFollowing.value = Boolean(response.is_following);
+    profileUser.value = responsePayload.user;
+    isFollowing.value = Boolean(responsePayload.is_following);
     
-  } catch (error) {
-    if (requestId !== activeRequest) return;
+  } catch (errorResponse) {
+    if (requestId !== activeRequestId) return;
 
-    if (error.status === 401) {
-      redirectToLogin();
+    if (errorResponse.status === 401) {
       return;
     }
 
-    console.error("Erro ao carregar o perfil", error);
+    console.error('Failed to load user profile:', errorResponse);
     profileUser.value = null;
-    errorMessage.value = error.status === 404
+    errorMessage.value = errorResponse.status === 404
       ? 'User not found.'
       : 'Could not load profile.';
   } finally {
-    if (requestId === activeRequest) {
+    if (requestId === activeRequestId) {
       loading.value = false;
     }
   }
 };
 
 watch(() => route.params.username, () => {
-  fetchUserProfile();
+  void loadUserProfile();
 });
 
-onMounted(async () => {
-  if (!getToken()) {
-    router.push('/login');
-    return;
-  }
-  await fetchUserProfile();
+onMounted(() => {
+  void loadUserProfile();
 });
+
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(profileUser.value, 256);
+};
 
 const handleFollowToggle = async () => {
   if (isOwnProfile.value || actionLoading.value) return;
@@ -93,27 +86,28 @@ const handleFollowToggle = async () => {
   
   try {
     const path = `/users/${encodeURIComponent(profileUser.value.username)}/follow`;
-    const response = isFollowing.value
+    const responsePayload = isFollowing.value
       ? await api.delete(path)
       : await api.post(path);
 
-    isFollowing.value = Boolean(response.is_following);
+    isFollowing.value = Boolean(responsePayload.is_following);
 
-    if (typeof response.followers_count === 'number') {
-      profileUser.value.followers_count = response.followers_count;
+    if (typeof responsePayload.followers_count === 'number') {
+      profileUser.value.followers_count = responsePayload.followers_count;
     }
 
-    if (typeof response.viewer_following_count === 'number' && userStore.currentUser) {
-      userStore.currentUser.following_count = response.viewer_following_count;
+    if (typeof responsePayload.viewer_following_count === 'number' && userStore.currentUser) {
+      userStore.currentUser.following_count = responsePayload.viewer_following_count;
     }
-  } catch (error) {
-    if (error.status === 401) {
-      redirectToLogin();
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
       return;
     }
 
-    console.error('Erro ao atualizar seguimento', error);
-    actionError.value = error.firstMessage ? error.firstMessage() : error.message;
+    console.error('Failed to update follow status:', errorResponse);
+    actionError.value = errorResponse.firstMessage
+      ? errorResponse.firstMessage()
+      : errorResponse.message;
   } finally {
     actionLoading.value = false;
   }
@@ -137,7 +131,7 @@ const handleFollowToggle = async () => {
       
       <header class="profile-header">
         <div class="profile-avatar-container">
-          <img class="profile-avatar" :src="avatarUrl" alt="User avatar">
+          <img class="profile-avatar" :src="avatarUrl" alt="User avatar" @error="handleAvatarError">
         </div>
 
         <section class="profile-info">
@@ -168,14 +162,14 @@ const handleFollowToggle = async () => {
           <div class="info-bio">
             <h1 class="fullname">{{ profileUser.name || profileUser.username }}</h1>
             <div class="bio-text">
-              {{ profileUser.bio }}
+              {{ profileUser.bio || 'No bio yet.' }}
             </div>
           </div>
         </section>
       </header>
 
       <div class="profile-tabs">
-        <a href="#" class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</a>
+        <span class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</span>
       </div>
 
       <div class="posts-grid">

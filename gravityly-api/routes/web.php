@@ -7,11 +7,11 @@ Route::get('/', function () {
 });
 
 Route::get('/storage/avatars/{filename}', function ($filename) {
-    $path = storage_path('app/public/avatars/' . $filename);
-    
-    if (!file_exists($path)) {
+    $avatarPath = storage_path('app/public/avatars/'.$filename);
+
+    if (! file_exists($avatarPath)) {
         abort(404);
     }
-    
-    return response()->file($path);
+
+    return response()->file($avatarPath);
 });

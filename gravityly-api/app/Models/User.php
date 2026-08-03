@@ -57,15 +57,16 @@ class User extends Authenticatable
     /**
      * Users that this user follows.
      */
-    public function followers()
+    public function followers(): HasMany
     {
         return $this->hasMany(Follow::class, 'following_id');
     }
 
-    public function following()
+    public function following(): HasMany
     {
         return $this->hasMany(Follow::class, 'follower_id');
     }
+
     public function sentMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');

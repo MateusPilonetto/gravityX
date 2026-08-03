@@ -1,67 +1,53 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { api, clearToken, getProfileAvatarUrl, getToken } from '../services/api';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import {
+  api,
+  clearToken,
+  getFallbackAvatarUrl,
+  getProfileAvatarUrl,
+} from '../services/api';
 import { userStore } from '../store';
 
 const router = useRouter();
-const route = useRoute();
 
 const profileUser = ref(null);
 const loading = ref(true);
 const errorMessage = ref('');
-const isOwnProfile = ref(true);
 
 const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
 
-const fetchProfile = async () => {
+const loadProfile = async () => {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    const username = route.params.username;
+    const responsePayload = await api.get('/me');
 
-    let response;
-
-    if (username) {
-      isOwnProfile.value = false;
-      response = await api.get(`/users/${encodeURIComponent(username)}`);
-      profileUser.value = response.user;
-    } else {
-      isOwnProfile.value = true;
-      response = await api.get('/me');
-      profileUser.value = response.data;
+    if (!responsePayload?.data || typeof responsePayload.data !== 'object') {
+      throw new Error('The server returned an invalid profile response.');
     }
-  } catch (error) {
-    if (error.status === 401) {
-      clearToken();
-      userStore.clearUser();
-      router.replace('/login');
+
+    profileUser.value = responsePayload.data;
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
       return;
     }
 
-    console.error(error);
+    console.error('Failed to load profile:', errorResponse);
     errorMessage.value = 'Could not load profile.';
   } finally {
     loading.value = false;
   }
 };
 
-onMounted(async () => {
-  if (!getToken()) {
-    router.push('/login');
-    return;
-  }
-
-  await fetchProfile();
+onMounted(() => {
+  void loadProfile();
 });
 
-watch(
-  () => route.params.username,
-  () => {
-    fetchProfile();
-  }
-);
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(profileUser.value, 256);
+};
 
 const handleLogout = () => {
   clearToken();
@@ -87,17 +73,17 @@ const handleLogout = () => {
       
       <header class="profile-header">
         <div class="profile-avatar-container">
-          <img class="profile-avatar" :src="avatarUrl" alt="User avatar">
+          <img class="profile-avatar" :src="avatarUrl" alt="User avatar" @error="handleAvatarError">
         </div>
 
         <section class="profile-info">
           <div class="info-top">
             <h2 class="username">{{ profileUser.username }}</h2>
             
-            <router-link v-if="isOwnProfile" to="/profile/edit" class="btn-edit">Edit profile</router-link>
-            <a href="#" @click.prevent="handleLogout" class="settings-icon" title="Log Out">
+            <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
+            <button type="button" @click="handleLogout" class="settings-icon" title="Log out" aria-label="Log out">
               <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </a>
+            </button>
           </div>
 
           <ul class="info-stats">
@@ -116,8 +102,8 @@ const handleLogout = () => {
       </header>
 
       <div class="profile-tabs">
-        <a href="#" class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</a>
-        <a href="#" class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</a>
+        <span class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</span>
+        <span class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</span>
       </div>
 
       <div class="posts-grid">
@@ -144,7 +130,7 @@ const handleLogout = () => {
 .info-top { display: flex; align-items: center; margin-bottom: 20px; gap: 15px; }
 .username { font-size: 1.25rem; font-weight: 500; margin: 0; color: #C9C2E8; }
 .btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
-.settings-icon { color: #ff5d5d; font-size: 1.2rem; text-decoration: none; }
+.settings-icon { color: #ff5d5d; font-size: 1.2rem; background: transparent; border: 0; cursor: pointer; }
 .info-stats { display: flex; list-style: none; padding: 0; margin: 0 0 20px 0; gap: 40px; }
 .stat-count { font-weight: bold; color: #FFC857; }
 .info-bio { font-size: 0.95rem; line-height: 1.5; }

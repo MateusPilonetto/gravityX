@@ -1,5 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const TOKEN_KEY = 'auth_token';
+let unauthorizedResponseHandler = null;
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -17,10 +18,18 @@ export function isAuthenticated() {
   return Boolean(getToken());
 }
 
+export function setUnauthorizedResponseHandler(handler) {
+  unauthorizedResponseHandler = handler;
+}
+
+export function getFallbackAvatarUrl(user, size = 150) {
+  const name = encodeURIComponent(user?.name || user?.username || 'User');
+  return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=${size}&bold=true`;
+}
+
 export function getProfileAvatarUrl(user, size = 150) {
   const profilePhotoUrl = user?.profile_photo_url;
-  const name = encodeURIComponent(user?.name || user?.username || 'User');
-  const fallbackUrl = `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=${size}&bold=true`;
+  const fallbackUrl = getFallbackAvatarUrl(user, size);
 
   if (!profilePhotoUrl) {
     return fallbackUrl;
@@ -97,13 +106,24 @@ async function request(path, { method = 'GET', body = null, auth = true } = {}) 
     throw new ApiError('Failed to connect to the server.', 0);
   }
 
-  const data = await response.json().catch(() => ({}));
+  const responsePayload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new ApiError(data.message || 'Something went wrong.', response.status, data.errors);
+    const error = new ApiError(
+      responsePayload.message || 'Something went wrong.',
+      response.status,
+      responsePayload.errors,
+    );
+
+    if (response.status === 401) {
+      clearToken();
+      unauthorizedResponseHandler?.();
+    }
+
+    throw error;
   }
 
-  return data;
+  return responsePayload;
 }
 
 export const api = {

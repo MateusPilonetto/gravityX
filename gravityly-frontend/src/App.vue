@@ -1,13 +1,21 @@
 <script setup>
 import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { userStore } from './store'; 
-import { api, clearToken, getProfileAvatarUrl, getToken } from './services/api';
+import { userStore } from './store';
+import {
+  api,
+  clearToken,
+  getFallbackAvatarUrl,
+  getProfileAvatarUrl,
+  getToken,
+  setUnauthorizedResponseHandler,
+} from './services/api';
 
 const route = useRoute();
 const router = useRouter();
 
-const isAuthPage = computed(() => ['/login', '/register'].includes(route.path));
+const isGuestPage = computed(() => Boolean(route.meta.guestOnly));
+const showApplicationChrome = computed(() => Boolean(route.meta.requiresAuth));
 
 const navAvatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 50));
 
@@ -17,10 +25,16 @@ const redirectToLogin = () => {
   clearToken();
   userStore.clearUser();
 
-  if (!isAuthPage.value) {
+  if (!isGuestPage.value) {
     router.replace('/login');
   }
 };
+
+const handleAvatarError = (event) => {
+  event.currentTarget.src = getFallbackAvatarUrl(userStore.currentUser, 50);
+};
+
+setUnauthorizedResponseHandler(redirectToLogin);
 
 const loadCurrentUser = async () => {
   const requestId = ++activeSessionRequest;
@@ -31,27 +45,31 @@ const loadCurrentUser = async () => {
   }
 
   try {
-    const response = await api.get('/me');
+    const responsePayload = await api.get('/me');
 
     if (requestId === activeSessionRequest) {
-      userStore.currentUser = response.data;
+      userStore.setCurrentUser(responsePayload.data);
     }
-  } catch (error) {
+  } catch (errorResponse) {
     if (requestId !== activeSessionRequest) return;
 
-    if (error.status === 401) {
+    if (errorResponse.status === 401) {
       redirectToLogin();
       return;
     }
 
-    console.error('Erro ao carregar sessão global:', error);
+    console.error('Failed to load the current session:', errorResponse);
   }
 };
 
 watch(() => route.path, () => {
-  if (isAuthPage.value) {
+  if (!route.meta.requiresAuth) {
     activeSessionRequest++;
-    userStore.clearUser();
+
+    if (isGuestPage.value) {
+      userStore.clearUser();
+    }
+
     return;
   }
 
@@ -64,7 +82,7 @@ const handleLogout = () => {
 </script>
 
 <template>
-    <header v-if="!isAuthPage">
+    <header v-if="showApplicationChrome">
       <div class="logo-items">
         <img alt="Gravityly logo" class="logo" src="./assets/gravityly-logo-light.svg" width="125" height="125" />
         <h1 class="logo-title">Gravityly</h1>
@@ -74,9 +92,9 @@ const handleLogout = () => {
         <i class="fa-solid fa-bell fa-2xl notification-icon"></i>
       </div>
       <div class="glass-effect buttons">
-        <a href="#" @click.prevent="handleLogout" class="sua-classe-de-css-aqui">
+        <button type="button" @click="handleLogout" class="logout-button" aria-label="Log out">
           <i class="fa-solid fa-arrow-right-from-bracket"></i>
-        </a>
+        </button>
       </div>
       </section>
       
@@ -87,26 +105,32 @@ const handleLogout = () => {
       <router-view />
     </main>
 
-     <div class="bottom-nav-wrapper" v-if="!isAuthPage">     
+     <div class="bottom-nav-wrapper" v-if="showApplicationChrome">
         <nav class="bottom-nav">       
-          <router-link to="/" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-house nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/" class="nav-link">
+            <i class="fa-solid fa-house nav-icon"></i>
           </router-link>
 
-          <router-link to="/search" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-magnifying-glass nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/search" class="nav-link">
+            <i class="fa-solid fa-magnifying-glass nav-icon"></i>
           </router-link>        
           
-          <router-link to="/post/create" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-square-plus nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/post/create" class="nav-link">
+            <i class="fa-solid fa-square-plus nav-icon"></i>
           </router-link>        
           
-          <router-link to="/messages" custom v-slot="{ navigate, isActive }">
-            <i class="fa-solid fa-message nav-icon" :class="{ active: isActive }" @click="navigate"></i>
+          <router-link to="/messages" class="nav-link">
+            <i class="fa-solid fa-message nav-icon"></i>
           </router-link>        
           
           <router-link to="/profile" class="nav-link">
-            <img class="nav-profile-pic" loading="lazy" :src="navAvatarUrl" alt="Profile photo">
+            <img
+              class="nav-profile-pic"
+              loading="lazy"
+              :src="navAvatarUrl"
+              alt="Profile photo"
+              @error="handleAvatarError"
+            >
           </router-link>    
         </nav>   
       </div>
@@ -157,6 +181,15 @@ header {
   
   transition: all 0.3s ease; 
   cursor: pointer;
+}
+
+.logout-button {
+  display: flex;
+  color: #ff5d5d;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.25rem;
 }
 
 .notifications-area:hover {
@@ -212,10 +245,14 @@ header {
   transition: all 0.3s ease;
 }
 
-.nav-icon.active, 
+.nav-link.router-link-active .nav-icon,
 .nav-icon:hover {
   color: #C9C2E8; 
   transform: translateY(-2px); 
+}
+
+.nav-link {
+  display: flex;
 }
 
 .nav-profile-pic {

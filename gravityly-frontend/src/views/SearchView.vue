@@ -1,38 +1,73 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { api, getProfileAvatarUrl } from '../services/api';
+import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 
 const router = useRouter();
 
 const searchQuery = ref('');
-const searchResults = ref([]); 
+const searchResults = ref([]);
 const loading = ref(false);
+const searchError = ref('');
+const hasSearched = ref(false);
+let activeSearchRequestId = 0;
 
-const search = async () => {
-    if(!searchQuery.value.trim()) return;
+const resetSearchState = () => {
+    activeSearchRequestId += 1;
+    searchResults.value = [];
+    searchError.value = '';
+    hasSearched.value = false;
+};
 
+const searchUsers = async () => {
+    const normalizedQuery = searchQuery.value.trim();
+
+    if (!normalizedQuery) {
+        resetSearchState();
+        return;
+    }
+
+    const requestId = ++activeSearchRequestId;
     loading.value = true;
+    searchError.value = '';
+    hasSearched.value = true;
 
     try {
-        const termo = encodeURIComponent(searchQuery.value);
-        const response = await api.get(`/search?q=${termo}`);
-        
-        searchResults.value = response.data || response || []; 
-    } 
-    catch (error) {
-        console.error("Error on search:", error);
-    } 
-    finally {
-        loading.value = false;
+        const encodedQuery = encodeURIComponent(normalizedQuery);
+        const responsePayload = await api.get(`/search?q=${encodedQuery}`);
+        const users = responsePayload?.data ?? responsePayload;
+
+        if (!Array.isArray(users)) {
+            throw new Error('The server returned an invalid search response.');
+        }
+
+        if (requestId === activeSearchRequestId) {
+            searchResults.value = users;
+        }
+    } catch (errorResponse) {
+        if (requestId !== activeSearchRequestId || errorResponse.status === 401) {
+            return;
+        }
+
+        console.error('Failed to search users:', errorResponse);
+        searchResults.value = [];
+        searchError.value = 'Could not search users. Please try again.';
+    } finally {
+        if (requestId === activeSearchRequestId) {
+            loading.value = false;
+        }
     }
-}
+};
 
 const goToProfile = (username) => {
     router.push({ name: 'user-profile', params: { username } });
 };
 
 const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
+
+const handleAvatarError = (event, user) => {
+    event.currentTarget.src = getFallbackAvatarUrl(user, 100);
+};
 </script>
 
 <template>
@@ -43,10 +78,11 @@ const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
                 type="search"  
                 id="searchInput"
                 v-model="searchQuery"
-                @keyup.enter="search"
+                @input="resetSearchState"
+                @keyup.enter="searchUsers"
                 placeholder="Search users..."
             >
-            <button @click="search" type="submit" class="search-button glass-effect">
+            <button @click="searchUsers" type="button" class="search-button glass-effect" aria-label="Search users">
                 <i class="fa-solid fa-search fa-xl" style="color: #FFC857;"></i>
             </button>
         </div>
@@ -55,24 +91,30 @@ const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
             <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: #6F5CFF;"></i>
         </div>
         
-        <div v-else-if="searchQuery && searchResults.length === 0" class="status-message empty-state">
+        <div v-else-if="searchError" class="status-message error-state" role="alert">
+            <i class="fa-solid fa-triangle-exclamation fa-2xl" style="color: #ff8b8b; margin-bottom: 15px;"></i>
+            <p>{{ searchError }}</p>
+        </div>
+
+        <div v-else-if="hasSearched && searchResults.length === 0" class="status-message empty-state">
             <i class="fa-solid fa-ghost fa-2xl" style="color: rgba(255, 255, 255, 0.2); margin-bottom: 15px;"></i>
             <p>No users found for "{{ searchQuery }}"</p>
         </div>
 
         <div v-else-if="searchResults.length > 0" class="results-grid">
-            <div 
+            <button
                 v-for="user in searchResults" 
                 :key="user.id" 
                 class="user-card glass-effect"
                 @click="goToProfile(user.username)"
+                :aria-label="`Open ${user.username}'s profile`"
             >
-                <img :src="getAvatarUrl(user)" class="card-avatar" alt="Avatar">
+                <img :src="getAvatarUrl(user)" class="card-avatar" alt="User avatar" @error="handleAvatarError($event, user)">
                 <div class="card-info">
                     <h3 class="card-username">@{{ user.username }}</h3>
                     <p class="card-name">{{ user.name || 'Gravityly User' }}</p>
                 </div>
-            </div>
+            </button>
         </div>
     </div>
 </template>
@@ -152,6 +194,9 @@ const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
     backdrop-filter: blur(10px);
     cursor: pointer;
     transition: all 0.3s ease;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
 }
 
 .user-card:hover {
@@ -196,6 +241,12 @@ const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
 
 .empty-state p {
     color: #a8a8a8;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.error-state p {
+    color: #ffb3b3;
     font-size: 1.1rem;
     margin: 0;
 }

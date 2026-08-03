@@ -52,22 +52,23 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'data'    => new UserResource($user),
+            'data' => new UserResource($user),
         ], 200);
     }
 
-    public function search(Request $request)
+    public function search(Request $request): JsonResponse
     {
-        $query = $request->query('q');
-        
-        if (!$query) {
+        $searchQuery = trim((string) $request->query('q', ''));
+
+        if ($searchQuery === '') {
             return response()->json([]);
         }
 
-        $users = User::where('username', 'LIKE', "%{$query}%")
-                     ->orWhere('name', 'LIKE', "%{$query}%")
-                     ->limit(10)
-                     ->get(['id', 'username', 'name', 'profile_photo_url']);
+        $users = User::query()
+            ->where('username', 'LIKE', "%{$searchQuery}%")
+            ->orWhere('name', 'LIKE', "%{$searchQuery}%")
+            ->limit(10)
+            ->get(['id', 'username', 'name', 'profile_photo_url']);
 
         return response()->json($users);
     }
@@ -107,7 +108,7 @@ class ProfileController extends Controller
 
     private function findUserByUsername(string $username): User
     {
-        return User::where('username', $username)->firstOrFail();
+        return User::query()->where('username', $username)->firstOrFail();
     }
 
     private function loadProfileCounts(User $user): User

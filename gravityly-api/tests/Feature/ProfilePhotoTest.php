@@ -30,3 +30,31 @@ it('stores and returns a profile photo through the public storage path', functio
     expect($photoUrl)->toStartWith('/storage/avatars/');
     Storage::disk('public')->assertExists($path);
 });
+
+it('replaces an existing profile photo after the new photo is stored', function () {
+    Storage::fake('public');
+    $previousAvatarPath = 'avatars/previous-avatar.jpg';
+    Storage::disk('public')->put($previousAvatarPath, 'previous avatar');
+
+    $user = User::factory()->create([
+        'username' => 'replacement-user',
+        'profile_photo_url' => '/storage/'.$previousAvatarPath,
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->put('/api/me', [
+        'name' => $user->name,
+        'username' => $user->username,
+        'bio' => $user->bio,
+        'avatar' => UploadedFile::fake()->image('replacement-avatar.jpg'),
+    ], ['Accept' => 'application/json'])
+        ->assertOk();
+
+    $newAvatarUrl = $user->refresh()->profile_photo_url;
+    $newAvatarPath = Str::after(parse_url($newAvatarUrl, PHP_URL_PATH) ?? $newAvatarUrl, '/storage/');
+
+    expect($newAvatarPath)->not->toBe($previousAvatarPath);
+    Storage::disk('public')->assertMissing($previousAvatarPath);
+    Storage::disk('public')->assertExists($newAvatarPath);
+});
