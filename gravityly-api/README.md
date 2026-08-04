@@ -12,26 +12,52 @@ This is the REST API for the Gravityly project (Instagram Clone). Developed in *
 
 ## 🚀 How to Run the Development Environment
 
-The local environment is managed by Docker (using `compose.yaml` and `Dockerfile.dev`). Follow the steps below:
+The local development environment is managed by Docker using `compose.dev.yaml` and `Dockerfile.dev`. Follow the steps below:
 
 1. Clone the repository and access the API folder:
+
    ```bash
    cd gravityly-api
+   ```
+
 2. Create a copy of the environment variables file:
-    ```bash
-    cp .env.example .env
-3. Build the images and start the containers in the background (this will spin up both Laravel and the Database):
-    ```bash
-    docker compose up -d --build
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Build the images and start the containers in the background:
+
+   ```bash
+   docker compose -f compose.dev.yaml up -d --build
+   ```
+
 4. Install the PHP dependencies inside the application container:
-    ```bash
-    docker compose exec app composer install
+
+   ```bash
+   docker compose -f compose.dev.yaml exec app composer install
+   ```
+
 5. Generate the Laravel application key:
-    ```bash
-    docker compose exec app php artisan key:generate
+
+   ```bash
+   docker compose -f compose.dev.yaml exec app php artisan key:generate
+   ```
+
 6. Create the storage symlink so uploaded files (e.g. profile photos) are publicly reachable:
-    ```bash
-    docker compose exec app php artisan storage:link
-7. Run the migrations and seeders to structure and populate the database with test data:
-    ```bash
-    docker compose exec app php artisan migrate:fresh --seed
+
+   ```bash
+   docker compose -f compose.dev.yaml exec app php artisan storage:link
+   ```
+
+Pending migrations are applied automatically whenever the development container starts. To update an already-running environment manually, run:
+
+```bash
+docker compose -f compose.dev.yaml exec app php artisan migrate --force
+```
+
+To discard local data and recreate it with seed data, run this explicit reset command:
+
+```bash
+docker compose -f compose.dev.yaml exec app php artisan migrate:fresh --seed
+```

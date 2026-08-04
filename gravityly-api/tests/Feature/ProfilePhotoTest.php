@@ -31,6 +31,23 @@ it('stores and returns a profile photo through the public storage path', functio
     Storage::disk('public')->assertExists($path);
 });
 
+it('accepts the multipart method override used by the profile editor', function () {
+    Storage::fake('public');
+    $user = User::factory()->create(['username' => 'method-override-user']);
+
+    Sanctum::actingAs($user);
+
+    $this->post('/api/me', [
+        '_method' => 'PUT',
+        'name' => 'Method Override User',
+        'username' => 'method-override-user',
+        'bio' => 'Sent as multipart form data',
+        'avatar' => UploadedFile::fake()->image('avatar.jpg'),
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('data.profile_photo_url', fn (string $url): bool => str_starts_with($url, '/storage/avatars/'));
+});
+
 it('replaces an existing profile photo after the new photo is stored', function () {
     Storage::fake('public');
     $previousAvatarPath = 'avatars/previous-avatar.jpg';

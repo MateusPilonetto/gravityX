@@ -9,6 +9,7 @@ import NotFoundView from '../views/NotFoundView.vue';
 import SearchView from '../views/SearchView.vue';
 import MessagesView from '../views/MessagesView.vue';
 import CreatePostView from '../views/CreatePostView.vue';
+import PostDetailView from '../views/PostDetailView.vue';
 import { isAuthenticated } from '../services/api';
 
 const routes = [
@@ -61,9 +62,20 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/post/create',
+    path: '/posts/create',
     name: 'create-post',
     component: CreatePostView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/post/create',
+    redirect: { name: 'create-post' },
+  },
+  {
+    path: '/posts/:postId(\\d+)',
+    alias: '/post/:postId(\\d+)',
+    name: 'post-detail',
+    component: PostDetailView,
     meta: { requiresAuth: true },
   },
   {
