@@ -21,7 +21,11 @@ RUN composer dump-autoload --optimize \
     && mkdir -p database \
     && touch database/database.sqlite \
     && php artisan storage:link \
-    && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database
+    && chown -R www-data:www-data \
+        /var/www/storage \
+        /var/www/bootstrap/cache \
+        /var/www/database
 
-EXPOSE 9000
-CMD ["sh", "-c", "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+EXPOSE 10000
+
+CMD ["sh", "-c", "set -ex; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
