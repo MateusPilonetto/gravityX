@@ -9,12 +9,11 @@ RUN apk add --no-cache \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
+WORKDIR /var/www/gravityly-api
+COPY . .
 
 COPY gravityly-api/composer.json gravityly-api/composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
-
-COPY . .
 
 RUN composer dump-autoload --optimize \
     && mkdir -p database \
