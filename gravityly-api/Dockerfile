@@ -24,4 +24,4 @@ RUN composer dump-autoload --optimize \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database
 
 EXPOSE 9000
-CMD ["php-fpm"]
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
