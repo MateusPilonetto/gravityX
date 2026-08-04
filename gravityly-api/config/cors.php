@@ -8,8 +8,8 @@ return [
 
     'allowed_methods' => ['*'],
 
-     'allowed_origins' => [
-        'https://gravityly-1.onrender.com',
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'https://gravityly-1.onrender.com'),
         'http://localhost:5173',
     ],
 

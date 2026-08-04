@@ -4,50 +4,65 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class ProfileService
 {
     public function update(User $user, array $attributes, ?UploadedFile $avatar = null): User
     {
-        $previousAvatarUrl = $user->profile_photo_url;
         unset($attributes['avatar']);
 
         if ($avatar !== null) {
-            $attributes['profile_photo_url'] = $this->storeAvatar($avatar);
+            $attributes = [
+                ...$attributes,
+                ...$this->avatarAttributes($avatar),
+                'profile_photo_url' => '/media/avatars/'.$user->id,
+            ];
         }
 
         $user->update($attributes);
 
-        if ($avatar !== null && $previousAvatarUrl !== null) {
-            $this->deleteAvatar($previousAvatarUrl);
-        }
-
         return $user;
     }
 
-    private function storeAvatar(UploadedFile $avatar): string
+    /**
+     * @return array{profile_photo_data: resource, profile_photo_mime_type: string}
+     */
+    private function avatarAttributes(UploadedFile $avatar): array
     {
-        $path = $avatar->store('avatars', 'public');
+        $data = $avatar->get();
 
-        return '/storage/'.$path;
+        if (! is_string($data) || $data === '') {
+            throw new RuntimeException('Unable to read the profile photo.');
+        }
+
+        $mimeType = $avatar->getMimeType();
+
+        if (! in_array($mimeType, ['image/jpeg', 'image/png'], true)) {
+            throw new RuntimeException('The profile photo has an unsupported MIME type.');
+        }
+
+        return [
+            'profile_photo_data' => $this->databaseBlob($data),
+            'profile_photo_mime_type' => $mimeType,
+        ];
     }
 
-    private function deleteAvatar(string $profilePhotoUrl): void
+    /**
+     * Use a LOB binding so bytea is written correctly by PDO_PGSQL.
+     *
+     * @return resource
+     */
+    private function databaseBlob(string $data)
     {
-        $urlPath = parse_url($profilePhotoUrl, PHP_URL_PATH);
-        $currentPath = is_string($urlPath) ? $urlPath : $profilePhotoUrl;
-        $currentPath = ltrim($currentPath, '/');
+        $stream = fopen('php://temp', 'w+b');
 
-        $publicUrlPath = parse_url(Storage::disk('public')->url(''), PHP_URL_PATH) ?? '/storage';
-        $publicUrlPath = trim($publicUrlPath, '/');
-
-        if (str_starts_with($currentPath, $publicUrlPath.'/')) {
-            $currentPath = substr($currentPath, strlen($publicUrlPath) + 1);
+        if ($stream === false || fwrite($stream, $data) !== strlen($data)) {
+            throw new RuntimeException('Unable to prepare the profile photo for storage.');
         }
 
-        if (str_starts_with($currentPath, 'avatars/') && Storage::disk('public')->exists($currentPath)) {
-            Storage::disk('public')->delete($currentPath);
-        }
+        rewind($stream);
+
+        return $stream;
     }
 }

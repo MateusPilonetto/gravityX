@@ -8,7 +8,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Post extends Model
 {
-    protected $fillable = ['user_id', 'caption', 'body'];
+    protected $fillable = [
+        'caption',
+        'body',
+        'image_path',
+        'image_data',
+        'image_mime_type',
+    ];
+
+    protected $hidden = [
+        'image_data',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'user_id' => 'integer',
+            'is_liked' => 'boolean',
+        ];
+    }
 
     public function user(): BelongsTo
     {

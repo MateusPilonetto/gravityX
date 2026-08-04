@@ -19,11 +19,14 @@ class User extends Authenticatable
         'password',
         'bio',
         'profile_photo_url',
+        'profile_photo_data',
+        'profile_photo_mime_type',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'profile_photo_data',
     ];
 
     protected function casts(): array

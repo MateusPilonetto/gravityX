@@ -19,6 +19,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
+COPY gravityly-api/docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 COPY gravityly-api/composer.json gravityly-api/composer.lock ./
 
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
@@ -36,4 +38,4 @@ RUN composer dump-autoload --optimize \
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "set -ex; php artisan optimize:clear; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+CMD ["sh", "-c", "set -ex; php artisan optimize:clear; mkdir -p storage/app/public; php artisan storage:link --force; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]

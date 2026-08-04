@@ -108,7 +108,19 @@ class ProfileController extends Controller
 
     private function findUserByUsername(string $username): User
     {
-        return User::query()->where('username', $username)->firstOrFail();
+        return User::query()
+            ->select([
+                'id',
+                'name',
+                'username',
+                'email',
+                'bio',
+                'profile_photo_url',
+                'created_at',
+                'updated_at',
+            ])
+            ->where('username', $username)
+            ->firstOrFail();
     }
 
     private function loadProfileCounts(User $user): User
