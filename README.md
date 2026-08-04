@@ -28,11 +28,13 @@ Open your terminal and execute the following commands to spin up the API:
 ```bash
 cd gravityly-api
 cp .env.example .env
-docker compose up -d --build
-docker compose exec app composer install
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan storage:link
-docker compose exec app php artisan migrate:fresh --seed
+docker compose -f compose.dev.yaml up -d --build
+docker compose -f compose.dev.yaml exec app composer install
+docker compose -f compose.dev.yaml exec app php artisan key:generate
+docker compose -f compose.dev.yaml exec app php artisan storage:link
+# Migrations run automatically when the development container starts.
+# To apply pending migrations without resetting local data:
+docker compose -f compose.dev.yaml exec app php artisan migrate --force
 ```
 
 The API will be available at `http://localhost:8000`.

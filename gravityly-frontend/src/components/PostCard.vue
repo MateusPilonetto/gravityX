@@ -427,4 +427,3 @@ async function handleDelete() {
   }
 }
 </style>
-

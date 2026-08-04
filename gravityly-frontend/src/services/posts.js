@@ -5,7 +5,6 @@ function getObjectPayload(responsePayload, key) {
 
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
-
 function getArrayPayload(responsePayload, key) {
   const value = responsePayload?.[key] ?? responsePayload?.data;
 
@@ -111,4 +110,3 @@ export async function createPostComment(postId, body) {
       : null,
   };
 }
-
