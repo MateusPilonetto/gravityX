@@ -34,6 +34,6 @@ RUN composer dump-autoload --optimize \
         /var/www/bootstrap/cache \
         /var/www/database
 
-EXPOSE 8000
+EXPOSE 10000
 
-CMD ["sh", "-c", "set -ex; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+CMD ["sh", "-c", "set -ex; php artisan optimize:clear; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
