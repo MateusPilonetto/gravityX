@@ -5,13 +5,13 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    command: sh -c "mkdir -p /var/db && touch /var/db/database.sqlite && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
     volumes:
       - .:/var/www
-      - sqlite_data:/var/www/database
+      - sqlite_data:/var/db
     environment:
       - DB_CONNECTION=sqlite
-      - DB_DATABASE=/var/www/database/database.sqlite
+      - DB_DATABASE=/var/db/database.sqlite
       - APP_ENV=local
       - APP_DEBUG=true
 

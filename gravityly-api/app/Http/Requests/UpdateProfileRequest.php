@@ -8,8 +8,6 @@ class UpdateProfileRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Access is already restricted to authenticated users by the
-        // 'auth:sanctum' middleware on the route.
         return true;
     }
 

@@ -27,6 +27,25 @@ export function getFallbackAvatarUrl(user, size = 150) {
   return `https://ui-avatars.com/api/?name=${name}&background=6F5CFF&color=fff&size=${size}&bold=true`;
 }
 
+export function getApiAssetUrl(assetUrl, fallbackUrl = '') {
+  if (typeof assetUrl !== 'string' || !assetUrl.trim()) {
+    return fallbackUrl;
+  }
+
+  try {
+    const apiOrigin = new URL(API_BASE_URL, window.location.origin).origin;
+    const resolvedUrl = new URL(assetUrl, apiOrigin);
+
+    if (!['http:', 'https:'].includes(resolvedUrl.protocol)) {
+      return fallbackUrl;
+    }
+
+    return resolvedUrl.href;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 export function getProfileAvatarUrl(user, size = 150) {
   const profilePhotoUrl = user?.profile_photo_url;
   const fallbackUrl = getFallbackAvatarUrl(user, size);
@@ -48,7 +67,7 @@ export function getProfileAvatarUrl(user, size = 150) {
       return `${apiOrigin}/storage/${path}${photoUrl.search}${photoUrl.hash}`;
     }
 
-    return photoUrl.href;
+    return getApiAssetUrl(profilePhotoUrl, fallbackUrl);
   } catch {
     return fallbackUrl;
   }

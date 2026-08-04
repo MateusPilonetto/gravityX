@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 import { createPost } from '../services/posts';
@@ -10,24 +10,104 @@ const form = reactive({
   caption: '',
   body: '',
 });
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const imageInput = ref(null);
+const selectedImage = ref(null);
+const imagePreviewUrl = ref('');
+const imageError = ref('');
 const submitting = ref(false);
 const errorMessage = ref('');
 
 const displayName = computed(() => userStore.currentUser?.name || userStore.currentUser?.username || 'Gravityly member');
 const username = computed(() => userStore.currentUser?.username || 'you');
 const avatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 112));
-const hasPostContent = computed(() => Boolean(form.caption.trim() || form.body.trim()));
+const selectedImageName = computed(() => selectedImage.value?.name || '');
+const hasPostContent = computed(() => Boolean(form.caption.trim() || form.body.trim() || selectedImage.value));
 
 function handleAvatarError(event) {
   event.currentTarget.src = getFallbackAvatarUrl(userStore.currentUser, 112);
+}
+
+function resetImageInput() {
+  if (imageInput.value) {
+    imageInput.value.value = '';
+  }
+}
+
+function revokeImagePreviewUrl() {
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value);
+    imagePreviewUrl.value = '';
+  }
+}
+
+function clearSelectedImage() {
+  revokeImagePreviewUrl();
+  selectedImage.value = null;
+  resetImageInput();
+}
+
+function validateImage(file) {
+  if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+    return 'Choose an image in JPEG, PNG, or WebP format.';
+  }
+
+  if (file.size === 0) {
+    return 'The selected image is empty. Choose another file.';
+  }
+
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return 'The image must be 5 MB or smaller.';
+  }
+
+  return '';
+}
+
+function handleImageSelection(event) {
+  const [file] = event.target.files || [];
+
+  if (!file) {
+    return;
+  }
+
+  const validationMessage = validateImage(file);
+
+  if (validationMessage) {
+    imageError.value = validationMessage;
+    resetImageInput();
+    return;
+  }
+
+  imageError.value = '';
+  errorMessage.value = '';
+  revokeImagePreviewUrl();
+  selectedImage.value = file;
+
+  try {
+    imagePreviewUrl.value = URL.createObjectURL(file);
+  } catch {
+    clearSelectedImage();
+    imageError.value = 'The selected image could not be prepared for preview.';
+  }
+}
+
+function removeImage() {
+  clearSelectedImage();
+  imageError.value = '';
+}
+
+function handleImagePreviewError() {
+  clearSelectedImage();
+  imageError.value = 'The selected image could not be previewed. Choose another image.';
 }
 
 async function handleSubmit() {
   const caption = form.caption.trim();
   const body = form.body.trim();
 
-  if (!caption && !body) {
-    errorMessage.value = 'Write a caption or post content before publishing.';
+  if (!caption && !body && !selectedImage.value) {
+    errorMessage.value = 'Write a caption, post content, or add an image before publishing.';
     return;
   }
 
@@ -38,6 +118,7 @@ async function handleSubmit() {
     const post = await createPost({
       caption: caption || null,
       body: body || null,
+      image: selectedImage.value,
     });
 
     await router.push({
@@ -55,6 +136,8 @@ async function handleSubmit() {
     submitting.value = false;
   }
 }
+
+onBeforeUnmount(revokeImagePreviewUrl);
 </script>
 
 <template>
@@ -130,10 +213,62 @@ async function handleSubmit() {
             :disabled="submitting"
           ></textarea>
           <div class="editor-footer">
-            <p id="post-body-hint"><i class="fa-solid fa-sparkles" aria-hidden="true"></i> A title, content, or both is enough.</p>
+            <p id="post-body-hint"><i class="fa-solid fa-sparkles" aria-hidden="true"></i> A title, message, image, or any combination is enough.</p>
             <span>Be kind. Be curious.</span>
           </div>
         </div>
+      </section>
+
+      <section class="field-group image-field">
+        <div class="field-heading">
+          <span class="field-label">Add an image <span>Optional</span></span>
+          <span id="post-image-hint" class="character-counter">JPEG, PNG, or WebP · 5 MB max</span>
+        </div>
+
+        <label class="image-picker" :class="{ 'is-disabled': submitting }">
+          <span class="image-picker-icon"><i class="fa-regular fa-image" aria-hidden="true"></i></span>
+          <span class="image-picker-copy">
+            <strong>{{ selectedImage ? 'Replace selected image' : 'Choose an image' }}</strong>
+            <small>It will appear with your post in the community feed.</small>
+          </span>
+          <i class="fa-solid fa-arrow-up-from-bracket image-picker-action" aria-hidden="true"></i>
+          <input
+            ref="imageInput"
+            class="image-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-describedby="post-image-hint"
+            :disabled="submitting"
+            @change="handleImageSelection"
+          >
+        </label>
+
+        <div v-if="imagePreviewUrl" class="image-preview">
+          <img
+            :src="imagePreviewUrl"
+            class="image-preview-photo"
+            alt="Preview of the selected post image"
+            @error="handleImagePreviewError"
+          >
+          <div class="image-preview-footer">
+            <span class="selected-image-name" :title="selectedImageName">{{ selectedImageName }}</span>
+            <button
+              type="button"
+              class="remove-image-button"
+              :disabled="submitting"
+              aria-label="Remove selected image"
+              @click="removeImage"
+            >
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <p v-if="imageError" class="image-error" role="alert">
+          <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+          {{ imageError }}
+        </p>
       </section>
 
       <p v-if="errorMessage" class="form-error" role="alert">
@@ -379,6 +514,10 @@ async function handleSubmit() {
   margin-top: 1.2rem;
 }
 
+.image-field {
+  margin-top: 1.2rem;
+}
+
 .field-heading {
   display: flex;
   align-items: baseline;
@@ -392,7 +531,14 @@ async function handleSubmit() {
   font-weight: 700;
 }
 
-.field-heading label span {
+.field-label {
+  color: #f4f1ff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.field-heading label span,
+.field-label span {
   margin-left: 0.3rem;
   color: var(--muted);
   font-size: 0.74rem;
@@ -490,6 +636,152 @@ textarea:disabled {
 .editor-footer i {
   margin-right: 0.25rem;
   color: var(--gold);
+}
+
+.image-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 5.7rem;
+  overflow: hidden;
+  border: 1px dashed rgba(201, 194, 232, 0.38);
+  border-radius: 15px;
+  padding: 0.9rem;
+  background: rgba(12, 8, 24, 0.2);
+  color: var(--purple-soft);
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.image-picker:hover:not(.is-disabled),
+.image-picker:focus-within {
+  border-color: rgba(255, 200, 87, 0.8);
+  background: rgba(12, 8, 24, 0.38);
+  box-shadow: 0 0 0 4px rgba(255, 200, 87, 0.1);
+}
+
+.image-picker.is-disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.image-picker-icon {
+  display: grid;
+  width: 2.65rem;
+  height: 2.65rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(111, 92, 255, 0.22);
+  color: var(--gold);
+  font-size: 1.05rem;
+}
+
+.image-picker-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.image-picker-copy strong {
+  color: #f4f1ff;
+  font-size: 0.9rem;
+}
+
+.image-picker-copy small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.image-picker-action {
+  margin-left: auto;
+  color: var(--gold);
+}
+
+.image-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0 !important;
+  opacity: 0;
+}
+
+.image-preview {
+  overflow: hidden;
+  max-width: 100%;
+  border: 1px solid rgba(201, 194, 232, 0.24);
+  border-radius: 15px;
+  background: rgba(12, 8, 24, 0.35);
+}
+
+.image-preview-photo {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 30rem;
+  object-fit: cover;
+  background: rgba(12, 8, 24, 0.4);
+}
+
+.image-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border-top: 1px solid rgba(201, 194, 232, 0.13);
+}
+
+.selected-image-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-image-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.42rem 0.55rem;
+  background: rgba(255, 93, 93, 0.1);
+  color: #ffb2b2;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.remove-image-button:hover:not(:disabled) {
+  background: rgba(255, 93, 93, 0.2);
+}
+
+.remove-image-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.image-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: #ffb2b2;
+  font-size: 0.84rem;
 }
 
 .form-error {
@@ -612,6 +904,11 @@ textarea:disabled {
   .editor-footer span {
     display: none;
   }
+
+  .image-preview-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 390px) {
@@ -629,7 +926,8 @@ textarea:disabled {
   .publish-button,
   input,
   textarea,
-  .editor-shell {
+  .editor-shell,
+  .image-picker {
     transition: none;
   }
 }

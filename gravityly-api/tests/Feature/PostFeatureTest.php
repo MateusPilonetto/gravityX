@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Post;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -41,6 +44,7 @@ it('creates a post for the authenticated user and ignores a supplied author', fu
         ->assertCreated()
         ->assertJsonPath('post.caption', 'A caption')
         ->assertJsonPath('post.body', 'A complete post body.')
+        ->assertJsonPath('post.image_url', null)
         ->assertJsonPath('post.user.id', $author->id)
         ->assertJsonPath('post.user.username', 'post-author')
         ->assertJsonPath('post.likes_count', 0)
@@ -58,6 +62,47 @@ it('creates a post for the authenticated user and ignores a supplied author', fu
         'user_id' => $otherUser->id,
         'body' => 'A complete post body.',
     ]);
+});
+
+it('creates an image-only post and returns its public image URL', function () {
+    Storage::fake('public');
+    $author = User::factory()->create();
+
+    Sanctum::actingAs($author);
+
+    $response = $this->post('/api/posts', [
+        'image' => UploadedFile::fake()->image('post-image.png', 1200, 800),
+    ], ['Accept' => 'application/json']);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('post.caption', null)
+        ->assertJsonPath('post.body', null)
+        ->assertJsonPath('post.user.id', $author->id);
+
+    $post = Post::query()->sole();
+
+    expect($post->image_path)->toStartWith('posts/');
+    $response->assertJsonPath('post.image_url', Storage::disk('public')->url($post->image_path));
+    Storage::disk('public')->assertExists($post->image_path);
+});
+
+it('only accepts JPG, JPEG, PNG, and WebP post images up to 5 MB', function () {
+    $author = User::factory()->create();
+
+    Sanctum::actingAs($author);
+
+    $this->post('/api/posts', [
+        'image' => UploadedFile::fake()->image('post-image.gif'),
+    ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['image']);
+
+    $this->post('/api/posts', [
+        'image' => UploadedFile::fake()->image('post-image.png')->size(5121),
+    ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['image']);
 });
 
 it('normalizes content and rejects empty posts and comments', function () {
@@ -307,4 +352,24 @@ it('only allows the post author to delete a post', function () {
     $this->assertDatabaseMissing('posts', ['id' => $post->id]);
     $this->assertDatabaseMissing('likes', ['post_id' => $post->id]);
     $this->assertDatabaseMissing('comments', ['post_id' => $post->id]);
+});
+
+it('removes the public image when the post author deletes a post', function () {
+    Storage::fake('public');
+    $author = User::factory()->create();
+    $imagePath = 'posts/post-image.png';
+    $post = $author->posts()->create([
+        'body' => 'A post with an image.',
+        'image_path' => $imagePath,
+    ]);
+    Storage::disk('public')->put($imagePath, 'post image');
+
+    Sanctum::actingAs($author);
+
+    $this->deleteJson("/api/posts/{$post->id}")
+        ->assertOk()
+        ->assertJsonPath('message', 'Post deleted successfully.');
+
+    $this->assertDatabaseMissing('posts', ['id' => $post->id]);
+    Storage::disk('public')->assertMissing($imagePath);
 });

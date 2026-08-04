@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Post extends Model
 {
-    protected $fillable = ['caption', 'body'];
+    protected $fillable = ['caption', 'body', 'image_path'];
 
     protected function casts(): array
     {

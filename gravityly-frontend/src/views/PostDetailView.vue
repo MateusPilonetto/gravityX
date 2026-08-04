@@ -167,6 +167,7 @@ watch(postId, () => {
       <PostCard
         :post="post"
         allow-delete
+        image-variant="detail"
         @updated="handlePostUpdated"
         @deleted="handlePostDeleted"
       />

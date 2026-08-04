@@ -44,9 +44,13 @@ class PostController extends Controller
 
     public function store(StorePostRequest $request): JsonResponse
     {
+        $attributes = $request->validated();
+        unset($attributes['image']);
+
         $post = $this->postService->create(
             $request->user(),
-            $request->validated()
+            $attributes,
+            $request->file('image')
         );
 
         return response()->json([

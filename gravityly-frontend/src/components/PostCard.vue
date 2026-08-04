@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { userStore } from '../store';
-import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
+import { getApiAssetUrl, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 import { deletePost, updatePostLike } from '../services/posts';
 
 const props = defineProps({
@@ -13,6 +13,10 @@ const props = defineProps({
   allowDelete: {
     type: Boolean,
     default: false,
+  },
+  imageVariant: {
+    type: String,
+    default: 'feed',
   },
 });
 
@@ -25,6 +29,17 @@ const deleteLoading = ref(false);
 const author = computed(() => props.post.user || {});
 const authorName = computed(() => author.value.name || author.value.username || 'Unknown user');
 const authorAvatarUrl = computed(() => getProfileAvatarUrl(author.value, 96));
+const hasPostImage = computed(() => Boolean(props.post?.image_url));
+const postImageUrl = computed(() => getApiAssetUrl(props.post?.image_url));
+const postImageAlt = computed(() => {
+  const caption = typeof props.post?.caption === 'string' ? props.post.caption.trim() : '';
+
+  if (caption) {
+    return `Image attached to: ${caption.slice(0, 120)}`;
+  }
+
+  return `Image attached to ${authorName.value}'s post`;
+});
 const postLocation = computed(() => ({
   name: 'post-detail',
   params: { postId: String(props.post.id) },
@@ -47,6 +62,11 @@ const authorLocation = computed(() => {
 });
 const likesCount = computed(() => Number(props.post.likes_count) || 0);
 const commentsCount = computed(() => Number(props.post.comments_count) || 0);
+const postImageFailed = ref(false);
+
+watch(() => props.post?.image_url, () => {
+  postImageFailed.value = false;
+}, { immediate: true });
 
 function formatDate(dateValue) {
   if (!dateValue) {
@@ -67,6 +87,10 @@ function formatDate(dateValue) {
 
 function handleAvatarError(event) {
   event.currentTarget.src = getFallbackAvatarUrl(author.value, 96);
+}
+
+function handlePostImageError() {
+  postImageFailed.value = true;
 }
 
 async function handleLike() {
@@ -146,7 +170,33 @@ async function handleDelete() {
       </time>
     </header>
 
-    <router-link :to="postLocation" class="post-content-link" :aria-label="`Open post by ${authorName}`">
+    <router-link
+      v-if="hasPostImage && postImageUrl && !postImageFailed"
+      :to="postLocation"
+      class="post-image-link"
+      :aria-label="`Open post image by ${authorName}`"
+    >
+      <span class="post-image-frame" :class="{ 'post-image-frame-detail': imageVariant === 'detail' }">
+        <img
+          :src="postImageUrl"
+          class="post-image"
+          :alt="postImageAlt"
+          @error="handlePostImageError"
+        >
+      </span>
+    </router-link>
+
+    <div v-else-if="hasPostImage" class="post-image-unavailable" role="status">
+      <i class="fa-regular fa-image" aria-hidden="true"></i>
+      <span>Post image unavailable.</span>
+    </div>
+
+    <router-link
+      v-if="post.caption || post.body"
+      :to="postLocation"
+      class="post-content-link"
+      :aria-label="`Open post by ${authorName}`"
+    >
       <h2 v-if="post.caption" class="post-caption">{{ post.caption }}</h2>
       <p v-if="post.body" class="post-body">{{ post.body }}</p>
     </router-link>
@@ -254,6 +304,49 @@ async function handleDelete() {
   display: block;
   margin: 1rem 0;
   color: inherit;
+}
+
+.post-image-link {
+  display: block;
+  margin: 1rem 0 0;
+  color: inherit;
+}
+
+.post-image-frame {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  border: 1px solid rgba(201, 194, 232, 0.25);
+  border-radius: 13px;
+  background: rgba(12, 8, 24, 0.38);
+}
+
+.post-image {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 32rem;
+  object-fit: cover;
+  background: rgba(12, 8, 24, 0.4);
+}
+
+.post-image-frame-detail .post-image {
+  max-height: 42rem;
+}
+
+.post-image-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 8rem;
+  margin-top: 1rem;
+  border: 1px dashed rgba(201, 194, 232, 0.3);
+  border-radius: 13px;
+  background: rgba(12, 8, 24, 0.24);
+  color: #c9c2e8;
+  font-size: 0.88rem;
 }
 
 .post-content-link:hover .post-caption,

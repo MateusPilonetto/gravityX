@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use Throwable;
 
 class PostService
 {
@@ -47,9 +51,22 @@ class PostService
     /**
      * @param  array{caption?: string|null, body?: string|null}  $attributes
      */
-    public function create(User $user, array $attributes): Post
+    public function create(User $user, array $attributes, ?UploadedFile $image = null): Post
     {
-        $post = $user->posts()->create($attributes);
+        $imagePath = null;
+
+        if ($image !== null) {
+            $imagePath = $this->storeImage($image);
+            $attributes['image_path'] = $imagePath;
+        }
+
+        try {
+            $post = $user->posts()->create($attributes);
+        } catch (Throwable $exception) {
+            $this->deleteImage($imagePath);
+
+            throw $exception;
+        }
 
         return $this->findFor($user, $post);
     }
@@ -96,7 +113,11 @@ class PostService
 
     public function delete(Post $post): void
     {
-        $post->delete();
+        $imagePath = $post->image_path;
+
+        if ($post->delete()) {
+            $this->deleteImage($imagePath);
+        }
     }
 
     private function postQuery(User $viewer): Builder
@@ -114,5 +135,25 @@ class PostService
                 'likes as is_liked' => fn (Builder $likes) => $likes
                     ->where('user_id', $viewer->id),
             ]);
+    }
+
+    private function storeImage(UploadedFile $image): string
+    {
+        $imagePath = $image->store('posts', 'public');
+
+        if (! is_string($imagePath)) {
+            throw new RuntimeException('Unable to store the post image.');
+        }
+
+        return $imagePath;
+    }
+
+    private function deleteImage(?string $imagePath): void
+    {
+        if ($imagePath === null || ! str_starts_with($imagePath, 'posts/')) {
+            return;
+        }
+
+        Storage::disk('public')->delete($imagePath);
     }
 }

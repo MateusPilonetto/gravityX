@@ -40,8 +40,30 @@ export async function fetchPost(postId) {
   };
 }
 
+function createPostFormData({ caption = null, body = null, image = null } = {}) {
+  const formData = new FormData();
+
+  if (typeof caption === 'string' && caption) {
+    formData.append('caption', caption);
+  }
+
+  if (typeof body === 'string' && body) {
+    formData.append('body', body);
+  }
+
+  if (image !== null && image !== undefined) {
+    if (!(image instanceof File)) {
+      throw new TypeError('The post image must be a file.');
+    }
+
+    formData.append('image', image);
+  }
+
+  return formData;
+}
+
 export async function createPost(attributes) {
-  const responsePayload = await api.post('/posts', attributes);
+  const responsePayload = await api.post('/posts', createPostFormData(attributes));
   const post = getObjectPayload(responsePayload, 'post');
 
   if (!post?.id) {
