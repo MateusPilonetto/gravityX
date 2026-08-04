@@ -89,3 +89,18 @@ it('replaces the database record for an existing profile photo', function () {
     expect($user->profile_photo_data)->not->toBe('previous avatar');
     expect($user->profile_photo_mime_type)->toBe('image/jpeg');
 });
+
+it('accepts profile photos up to 5 MB', function () {
+    $user = User::factory()->create(['username' => 'larger-photo-user']);
+
+    Sanctum::actingAs($user);
+
+    $this->put('/api/me', [
+        'name' => $user->name,
+        'username' => $user->username,
+        'bio' => $user->bio,
+        'avatar' => UploadedFile::fake()->image('larger-avatar.jpg')->size(4096),
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('data.profile_photo_url', '/media/avatars/'.$user->id);
+});

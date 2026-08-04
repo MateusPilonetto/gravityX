@@ -13,6 +13,7 @@ const fileInput = ref(null);
 const selectedFile = ref(null);
 const previewUrl = ref(null);
 let redirectTimer = null;
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 
 const form = ref({
   name: '',
@@ -69,11 +70,24 @@ const triggerFileInput = () => {
 const onFileChange = (event) => {
   const selectedImage = event.target.files?.[0];
 
-  if (selectedImage) {
-    revokePreviewUrl();
-    selectedFile.value = selectedImage;
-    previewUrl.value = URL.createObjectURL(selectedImage);
+  if (!selectedImage) {
+    return;
   }
+
+  error.value = '';
+  successMessage.value = '';
+
+  if (selectedImage.size > MAX_AVATAR_SIZE_BYTES) {
+    selectedFile.value = null;
+    revokePreviewUrl();
+    event.target.value = '';
+    error.value = 'Profile photos must be 5 MB or smaller.';
+    return;
+  }
+
+  revokePreviewUrl();
+  selectedFile.value = selectedImage;
+  previewUrl.value = URL.createObjectURL(selectedImage);
 };
 
 const handleAvatarError = (event) => {
