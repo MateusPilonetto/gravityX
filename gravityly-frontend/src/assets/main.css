@@ -32,7 +32,11 @@ a:hover {
   color: #C9C2E8;
 }
 
-p, input, button, a, textarea, label {
+::placeholder {
+  font-family: var(--font-display);
+}
+
+p, input, button, a, textarea, label, span, small, strong {
   font-family: var(--font-body);
 }
 

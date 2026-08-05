@@ -156,7 +156,6 @@ onBeforeUnmount(revokeImagePreviewUrl);
         <p>Share an update, a thought, or the first line of something bigger.</p>
       </div>
 
-      <span class="draft-pill"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> Draft</span>
     </header>
 
     <form class="post-composer" :aria-busy="submitting" @submit.prevent="handleSubmit">
@@ -399,7 +398,7 @@ onBeforeUnmount(revokeImagePreviewUrl);
   line-height: 1.45;
 }
 
-.draft-pill,
+
 .audience-chip {
   display: inline-flex;
   align-items: center;
@@ -408,14 +407,6 @@ onBeforeUnmount(revokeImagePreviewUrl);
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.draft-pill {
-  margin-top: 0.15rem;
-  padding: 0.52rem 0.7rem;
-  border: 1px solid rgba(201, 194, 232, 0.2);
-  background: rgba(47, 37, 75, 0.56);
-  color: var(--purple-soft);
 }
 
 .post-composer {
@@ -875,12 +866,6 @@ textarea:disabled {
 
   .create-header {
     grid-template-columns: auto 1fr;
-  }
-
-  .draft-pill {
-    grid-column: 2;
-    justify-self: start;
-    margin: -0.4rem 0 0;
   }
 
   .composer-footer {
