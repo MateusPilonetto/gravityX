@@ -9,6 +9,7 @@ import NotFoundView from '../views/NotFoundView.vue';
 import SearchView from '../views/SearchView.vue';
 import CreatePostView from '../views/CreatePostView.vue';
 import PostDetailView from '../views/PostDetailView.vue';
+import StoryViewerView from '../views/StoryViewerView.vue';
 import { isAuthenticated } from '../services/api';
 
 const routes = [
@@ -70,6 +71,12 @@ const routes = [
     name: 'post-detail',
     component: PostDetailView,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/stories/:storyId(\\d+)',
+    name: 'story-viewer',
+    component: StoryViewerView,
+    meta: { requiresAuth: true, hideApplicationChrome: true },
   },
   {
     path: '/:pathMatch(.*)*',

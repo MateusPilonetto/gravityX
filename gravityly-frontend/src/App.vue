@@ -15,7 +15,9 @@ const route = useRoute();
 const router = useRouter();
 
 const isGuestPage = computed(() => Boolean(route.meta.guestOnly));
-const showApplicationChrome = computed(() => Boolean(route.meta.requiresAuth));
+const showApplicationChrome = computed(() => (
+  Boolean(route.meta.requiresAuth) && !route.meta.hideApplicationChrome
+));
 
 const navAvatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 50));
 

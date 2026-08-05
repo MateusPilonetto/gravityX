@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import PostCard from '../components/PostCard.vue';
 import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
-import { fetchPosts } from '../services/posts';
+import { fetchFeed } from '../services/posts';
 import { uploadStory } from '../services/stories';
 import { userStore } from '../store';
 
@@ -15,6 +15,7 @@ const ACCEPTED_STORY_MEDIA_TYPES = new Set([
 ]);
 
 const posts = ref([]);
+const storyGroups = ref([]);
 const loading = ref(true);
 const errorMessage = ref('');
 const loadingPlaceholders = [1, 2, 3];
@@ -29,6 +30,11 @@ const displayName = computed(() => {
   return name ? name.split(/\s+/)[0] : 'creator';
 });
 const avatarUrl = computed(() => getProfileAvatarUrl(userStore.currentUser, 96));
+const activeStoryGroups = computed(() => storyGroups.value.filter((storyGroup) => (
+  storyGroup?.user?.username
+  && Array.isArray(storyGroup.stories)
+  && storyGroup.stories.some((story) => story?.id)
+)));
 const feedSummary = computed(() => {
   const count = posts.value.length;
 
@@ -44,7 +50,9 @@ async function loadPosts() {
   errorMessage.value = '';
 
   try {
-    posts.value = await fetchPosts();
+    const feed = await fetchFeed();
+    posts.value = feed.posts;
+    storyGroups.value = feed.stories;
   } catch (errorResponse) {
     if (errorResponse.status === 401) {
       return;
@@ -63,6 +71,14 @@ function updatePost(updatedPost) {
 
 function handleAvatarError(event) {
   event.currentTarget.src = getFallbackAvatarUrl(userStore.currentUser, 96);
+}
+
+function getStoryAvatarUrl(user) {
+  return getProfileAvatarUrl(user, 96);
+}
+
+function handleStoryAvatarError(event, user) {
+  event.currentTarget.src = getFallbackAvatarUrl(user, 96);
 }
 
 function resetStoryInput() {
@@ -117,7 +133,18 @@ async function handleStoryMediaSelection(event) {
   storyUploadError.value = '';
 
   try {
-    await uploadStory(file);
+    const story = await uploadStory(file);
+    const currentUser = userStore.currentUser;
+    const ownStoryGroup = storyGroups.value.find((storyGroup) => (
+      storyGroup?.user?.id === currentUser?.id
+    ));
+
+    if (ownStoryGroup) {
+      ownStoryGroup.stories = [...ownStoryGroup.stories, story];
+    } else if (currentUser?.id) {
+      storyGroups.value = [{ user: currentUser, stories: [story] }, ...storyGroups.value];
+    }
+
     storyUploadStatus.value = 'Your story is live for the next 24 hours.';
   } catch (errorResponse) {
     if (errorResponse.status === 401) {
@@ -145,30 +172,50 @@ onMounted(() => {
     <span class="ambient-orb ambient-orb-secondary" aria-hidden="true"></span>
 
     <section class="stories-container" aria-label="Stories">
-      <button
-        type="button"
-        class="story-upload-button"
-        :disabled="uploadingStory"
-        :aria-busy="uploadingStory"
-        aria-describedby="story-upload-hint"
-        @click="openStoryMediaPicker"
-      >
-        <span class="story-avatar-frame">
-          <img
-            :src="avatarUrl"
-            class="story-avatar"
-            alt="Your profile photo"
-            @error="handleAvatarError"
-          >
-          <span class="plus-icon" aria-hidden="true">
-            <i :class="uploadingStory ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plus'"></i>
+      <div class="stories-list">
+        <button
+          type="button"
+          class="story-upload-button"
+          :disabled="uploadingStory"
+          :aria-busy="uploadingStory"
+          aria-describedby="story-upload-hint"
+          @click="openStoryMediaPicker"
+        >
+          <span class="story-avatar-frame">
+            <img
+              :src="avatarUrl"
+              class="story-avatar"
+              alt="Your profile photo"
+              @error="handleAvatarError"
+            >
+            <span class="plus-icon" aria-hidden="true">
+              <i :class="uploadingStory ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plus'"></i>
+            </span>
           </span>
-        </span>
-        <span class="story-upload-copy">
-          <strong>{{ uploadingStory ? 'Uploading story…' : 'Add a story' }}</strong>
-          <small>Share an image or video</small>
-        </span>
-      </button>
+          <span class="story-upload-copy">
+            <strong>{{ uploadingStory ? 'Uploading story…' : 'Add a story' }}</strong>
+            <small>Share an image or video</small>
+          </span>
+        </button>
+
+        <router-link
+          v-for="storyGroup in activeStoryGroups"
+          :key="storyGroup.user.id"
+          class="story-preview"
+          :to="{ name: 'story-viewer', params: { storyId: storyGroup.stories[0].id } }"
+          :aria-label="`View ${storyGroup.user.name || storyGroup.user.username}'s stories`"
+        >
+          <span class="story-preview-avatar-frame">
+            <img
+              :src="getStoryAvatarUrl(storyGroup.user)"
+              class="story-preview-avatar"
+              :alt="`${storyGroup.user.name || storyGroup.user.username}'s profile photo`"
+              @error="handleStoryAvatarError($event, storyGroup.user)"
+            >
+          </span>
+          <span class="story-preview-name">{{ storyGroup.user.name || storyGroup.user.username }}</span>
+        </router-link>
+      </div>
       <input
         ref="storyInput"
         class="story-file-input"
@@ -292,12 +339,32 @@ onMounted(() => {
 <style scoped>
 .stories-container {
   display: grid;
-  gap: 0.3rem;
-  margin-bottom: 1rem;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+}
+
+.stories-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  overflow-x: auto;
+  padding: 0.15rem 0.2rem 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 124, 255, 0.65) transparent;
+}
+
+.stories-list::-webkit-scrollbar {
+  height: 0.35rem;
+}
+
+.stories-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(139, 124, 255, 0.65);
 }
 
 .story-upload-button {
   display: inline-flex;
+  flex: 0 0 auto;
   width: fit-content;
   align-items: center;
   gap: 0.7rem;
@@ -341,6 +408,58 @@ onMounted(() => {
 .story-upload-button:hover:not(:disabled) .story-avatar {
   border-color: var(--gold);
   transform: translateY(-2px);
+}
+
+.story-preview {
+  display: grid;
+  width: 4.4rem;
+  flex: 0 0 4.4rem;
+  gap: 0.35rem;
+  color: #fff;
+  text-align: center;
+}
+
+.story-preview:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+.story-preview:hover {
+  color: #fff;
+}
+
+.story-preview-avatar-frame {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--purple) 58%, #e982d4);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.story-preview:hover .story-preview-avatar-frame {
+  box-shadow: 0 0 0 4px rgba(255, 200, 87, 0.12);
+  transform: translateY(-2px);
+}
+
+.story-preview-avatar {
+  width: calc(100% - 0.27rem);
+  height: calc(100% - 0.27rem);
+  border: 2px solid #211934;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.story-preview-name {
+  overflow: hidden;
+  color: var(--purple-soft);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .plus-icon {
@@ -860,6 +979,21 @@ onMounted(() => {
 @media (max-width: 600px) {
   .feed-page {
     padding-top: 1rem;
+  }
+
+  .stories-list {
+    gap: 0.75rem;
+    margin-right: -1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .story-upload-copy small,
+  .story-upload-hint {
+    display: none;
+  }
+
+  .story-upload-copy strong {
+    font-size: 0.8rem;
   }
 
   .feed-hero,

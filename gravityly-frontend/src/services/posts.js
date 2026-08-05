@@ -6,15 +6,24 @@ function getObjectPayload(responsePayload, key) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
 function getArrayPayload(responsePayload, key) {
-  const value = responsePayload?.[key] ?? responsePayload?.data;
+  const value = responsePayload?.[key] ?? responsePayload?.data?.[key] ?? responsePayload?.data;
 
   return Array.isArray(value) ? value : [];
 }
 
-export async function fetchPosts() {
+export async function fetchFeed() {
   const responsePayload = await api.get('/posts');
 
-  return getArrayPayload(responsePayload, 'posts');
+  return {
+    posts: getArrayPayload(responsePayload, 'posts'),
+    stories: getArrayPayload(responsePayload, 'stories'),
+  };
+}
+
+export async function fetchPosts() {
+  const { posts } = await fetchFeed();
+
+  return posts;
 }
 
 export async function fetchPostsByUsername(username) {
