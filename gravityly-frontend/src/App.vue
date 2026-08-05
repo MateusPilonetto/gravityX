@@ -1,6 +1,7 @@
 <script setup>
 import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import PwaStatus from './components/PwaStatus.vue';
 import { userStore } from './store';
 import {
   api,
@@ -104,6 +105,8 @@ const handleLogout = () => {
     <main>
       <router-view />
     </main>
+
+    <PwaStatus />
 
      <div class="bottom-nav-wrapper" v-if="showApplicationChrome">
         <nav class="bottom-nav">       
