@@ -83,10 +83,12 @@ function handleStoryAvatarError(event, user) {
   event.currentTarget.src = getFallbackAvatarUrl(user, 96);
 }
 
-function resetStoryInput() {
-  if (storyInput.value) {
-    storyInput.value.value = '';
-  }
+function resetStoryInputs() {
+  [storyGalleryInput.value, storyCameraInput.value].forEach((input) => {
+    if (input) {
+      input.value = '';
+    }
+  });
 }
 
 function validateStoryMedia(file) {
@@ -112,7 +114,28 @@ function openStoryMediaPicker() {
 
   storyUploadStatus.value = '';
   storyUploadError.value = '';
-  storyInput.value?.click();
+
+  if (window.matchMedia('(max-width: 600px)').matches) {
+    isStorySourceChooserOpen.value = true;
+    return;
+  }
+
+  storyGalleryInput.value?.click();
+}
+
+function closeStorySourceChooser() {
+  isStorySourceChooserOpen.value = false;
+}
+
+function chooseStoryMediaSource(source) {
+  if (uploadingStory.value) {
+    return;
+  }
+
+  closeStorySourceChooser();
+
+  const input = source === 'camera' ? storyCameraInput.value : storyGalleryInput.value;
+  input?.click();
 }
 
 async function handleStoryMediaSelection(event) {
@@ -126,7 +149,7 @@ async function handleStoryMediaSelection(event) {
 
   if (validationMessage) {
     storyUploadError.value = validationMessage;
-    resetStoryInput();
+    resetStoryInputs();
     return;
   }
 
@@ -159,7 +182,7 @@ async function handleStoryMediaSelection(event) {
       || 'Could not upload the story.';
   } finally {
     uploadingStory.value = false;
-    resetStoryInput();
+    resetStoryInputs();
   }
 }
 
@@ -180,22 +203,19 @@ onMounted(() => {
           class="story-upload-button"
           :disabled="uploadingStory"
           :aria-busy="uploadingStory"
-          aria-describedby="story-upload-hint"
+          :aria-label="uploadingStory ? 'Uploading story' : 'Add a story'"
           @click="openStoryMediaPicker"
         >
           <span class="story-avatar-frame">
             <img
               :src="avatarUrl"
               class="story-avatar"
-              alt="Your profile photo"
+              alt=""
               @error="handleAvatarError"
             >
             <span class="plus-icon" aria-hidden="true">
               <i :class="uploadingStory ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plus'"></i>
             </span>
-          </span>
-          <span class="story-upload-copy">
-            <strong>{{ uploadingStory ? 'Uploading story…' : 'Add a story' }}</strong>
           </span>
         </button>
 
@@ -218,13 +238,75 @@ onMounted(() => {
         </router-link>
       </div>
       <input
-        ref="storyInput"
+        id="story-gallery-input"
+        ref="storyGalleryInput"
         class="story-file-input"
         type="file"
         accept="image/jpeg,image/png,image/webp,video/mp4"
+        tabindex="-1"
+        aria-hidden="true"
         :disabled="uploadingStory"
         @change="handleStoryMediaSelection"
       >
+      <input
+        id="story-camera-input"
+        ref="storyCameraInput"
+        class="story-file-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,video/mp4"
+        capture="environment"
+        tabindex="-1"
+        aria-hidden="true"
+        :disabled="uploadingStory"
+        @change="handleStoryMediaSelection"
+      >
+      <Teleport to="body">
+        <div
+          v-if="isStorySourceChooserOpen"
+          class="story-source-dialog-backdrop"
+          @click.self="closeStorySourceChooser"
+        >
+          <section
+            class="story-source-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="story-source-dialog-title"
+            @keydown.esc="closeStorySourceChooser"
+          >
+            <div class="story-source-dialog-heading">
+              <div>
+                <p class="story-source-dialog-kicker">NEW STORY</p>
+                <h2 id="story-source-dialog-title">Choose a source</h2>
+              </div>
+              <button
+                type="button"
+                class="story-source-dialog-close"
+                aria-label="Close story source chooser"
+                @click="closeStorySourceChooser"
+              >
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              </button>
+            </div>
+            <p class="story-source-dialog-description">Take a new photo or video, or choose one already on your device.</p>
+            <div class="story-source-options">
+              <button type="button" class="story-source-option" @click="chooseStoryMediaSource('camera')">
+                <span class="story-source-option-icon" aria-hidden="true"><i class="fa-solid fa-camera"></i></span>
+                <span>
+                  <strong>Camera</strong>
+                  <small>Take a photo or video</small>
+                </span>
+              </button>
+              <button type="button" class="story-source-option" @click="chooseStoryMediaSource('gallery')">
+                <span class="story-source-option-icon" aria-hidden="true"><i class="fa-regular fa-images"></i></span>
+                <span>
+                  <strong>Gallery</strong>
+                  <small>Choose from your device</small>
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </Teleport>
       <p v-if="storyUploadStatus" class="story-upload-status" role="status">{{ storyUploadStatus }}</p>
       <p v-if="storyUploadError" class="story-upload-error" role="alert">{{ storyUploadError }}</p>
     </section>
@@ -363,11 +445,8 @@ onMounted(() => {
 }
 
 .story-upload-button {
-  display: inline-flex;
+  display: block;
   flex: 0 0 auto;
-  width: fit-content;
-  align-items: center;
-  gap: 0.7rem;
   border: 0;
   padding: 0;
   background: transparent;
@@ -477,30 +556,10 @@ onMounted(() => {
   font-size: 0.7rem;
 }
 
-.story-upload-copy {
-  display: grid;
-  gap: 0.08rem;
-}
-
-.story-upload-copy strong {
-  font-size: 0.9rem;
-}
-
-.story-upload-copy small,
-.story-upload-hint,
 .story-upload-status,
 .story-upload-error {
   margin: 0;
   font-size: 0.75rem;
-}
-
-.story-upload-copy small,
-.story-upload-hint {
-  color: var(--muted);
-}
-
-.story-upload-hint {
-  margin-left: 4.7rem;
 }
 
 .story-upload-status {
@@ -512,7 +571,140 @@ onMounted(() => {
 }
 
 .story-file-input {
-  display: none;
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.story-source-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: rgba(10, 7, 18, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.story-source-dialog {
+  width: min(100%, 31rem);
+  padding: 1.15rem;
+  border: 1px solid rgba(139, 124, 255, 0.38);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(55, 43, 85, 0.98), rgba(31, 23, 50, 0.98));
+  box-shadow: 0 24px 65px rgba(0, 0, 0, 0.42);
+}
+
+.story-source-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.story-source-dialog-kicker {
+  margin: 0;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.story-source-dialog h2 {
+  margin: 0.25rem 0 0;
+  color: #fff;
+  font-size: 1.25rem;
+}
+
+.story-source-dialog-close {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border: 1px solid rgba(201, 194, 232, 0.24);
+  border-radius: 50%;
+  background: rgba(201, 194, 232, 0.08);
+  color: var(--purple-soft);
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+
+.story-source-dialog-close:hover {
+  border-color: rgba(255, 200, 87, 0.62);
+  background: rgba(255, 200, 87, 0.1);
+  color: var(--gold);
+}
+
+.story-source-dialog-description {
+  margin: 0.8rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.story-source-options {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.story-source-option {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 4.3rem;
+  border: 1px solid rgba(201, 194, 232, 0.2);
+  border-radius: 14px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(47, 37, 75, 0.58);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.story-source-option:hover {
+  border-color: rgba(255, 200, 87, 0.62);
+  background: rgba(255, 200, 87, 0.08);
+  transform: translateY(-1px);
+}
+
+.story-source-option-icon {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(255, 200, 87, 0.14);
+  color: var(--gold);
+  font-size: 1rem;
+}
+
+.story-source-option > span:last-child {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.story-source-option strong {
+  font-size: 0.92rem;
+}
+
+.story-source-option small {
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 .feed-page {
@@ -987,13 +1179,13 @@ onMounted(() => {
     padding-right: 1.25rem;
   }
 
-  .story-upload-copy small,
-  .story-upload-hint {
-    display: none;
+  .story-source-dialog-backdrop {
+    padding: 0.85rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom));
   }
 
-  .story-upload-copy strong {
-    font-size: 0.8rem;
+  .story-source-dialog {
+    width: 100%;
   }
 
   .feed-hero,
@@ -1037,6 +1229,8 @@ onMounted(() => {
   .quick-composer,
   .hero-create-button,
   .secondary-button,
+  .story-source-dialog-close,
+  .story-source-option,
   .skeleton-avatar,
   .skeleton-line,
   .skeleton-actions span,
