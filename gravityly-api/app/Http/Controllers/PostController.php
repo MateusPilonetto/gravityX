@@ -26,6 +26,19 @@ class PostController extends Controller
                 $this->postService->listFor($request->user())
             ),
         ]);
+
+        $user = $request->user();
+
+        $followingIds = $user->following()->pluck('users.id');
+
+        $usersWithStories = User::whereIn('id', $followingIds)
+            ->whereHas('activeStories')
+            ->with(['activeStories' => function ($query) {
+                $query->orderBy('created_at', 'asc');
+            }])
+            ->get();
+
+        return response()->json($usersWithStories);
     }
 
     public function userPosts(Request $request, string $username): JsonResponse

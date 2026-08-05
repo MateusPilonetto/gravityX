@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('media_path');
+            $table->enum('media_type', ['image', 'video']);
             $table->timestamp('expires_at');
             $table->timestamps();
         });

@@ -111,8 +111,6 @@ class PostService
     private function postQuery(User $viewer): Builder
     {
         return Post::query()
-            // Image bytes are fetched only by MediaController. Keeping them out
-            // of feed/detail queries avoids loading up to 5 MB per post.
             ->select([
                 'posts.id',
                 'posts.user_id',

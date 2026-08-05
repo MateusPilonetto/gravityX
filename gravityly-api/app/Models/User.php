@@ -52,11 +52,6 @@ class User extends Authenticatable
         return $this->hasMany(Like::class);
     }
 
-    public function stories(): HasMany
-    {
-        return $this->hasMany(Story::class);
-    }
-
     /**
      * Users that this user follows.
      */
@@ -70,13 +65,13 @@ class User extends Authenticatable
         return $this->hasMany(Follow::class, 'follower_id');
     }
 
-    public function sentMessages(): HasMany
+    public function stories() 
     {
-        return $this->hasMany(Message::class, 'sender_id');
+        return $this->hasMany(Story::class);
     }
 
-    public function receivedMessages(): HasMany
+    public function activeStories()
     {
-        return $this->hasMany(Message::class, 'receiver_id');
+        return $this->hasMany(Story::class)->where('expires_at', '>', now());
     }
 }
