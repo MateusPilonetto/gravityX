@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 
@@ -10,13 +10,52 @@ const searchResults = ref([]);
 const loading = ref(false);
 const searchError = ref('');
 const hasSearched = ref(false);
+const profileSuggestions = ref([]);
+const loadingSuggestions = ref(false);
+const suggestionsError = ref('');
+const showProfileSuggestions = computed(() => (
+    !searchQuery.value.trim() && !hasSearched.value
+));
 let activeSearchRequestId = 0;
+let activeSuggestionsRequestId = 0;
 
 const resetSearchState = () => {
     activeSearchRequestId += 1;
+    loading.value = false;
     searchResults.value = [];
     searchError.value = '';
     hasSearched.value = false;
+};
+
+const loadProfileSuggestions = async () => {
+    const requestId = ++activeSuggestionsRequestId;
+    loadingSuggestions.value = true;
+    suggestionsError.value = '';
+
+    try {
+        const responsePayload = await api.get('/suggestions');
+        const users = responsePayload?.data ?? responsePayload;
+
+        if (!Array.isArray(users)) {
+            throw new Error('The server returned an invalid suggestions response.');
+        }
+
+        if (requestId === activeSuggestionsRequestId) {
+            profileSuggestions.value = users;
+        }
+    } catch (errorResponse) {
+        if (requestId !== activeSuggestionsRequestId || errorResponse.status === 401) {
+            return;
+        }
+
+        console.error('Failed to load profile suggestions:', errorResponse);
+        profileSuggestions.value = [];
+        suggestionsError.value = 'Could not load profile suggestions. Please try again.';
+    } finally {
+        if (requestId === activeSuggestionsRequestId) {
+            loadingSuggestions.value = false;
+        }
+    }
 };
 
 const searchUsers = async () => {
@@ -65,9 +104,25 @@ const goToProfile = (username) => {
 
 const getAvatarUrl = (user) => getProfileAvatarUrl(user, 100);
 
+const getSuggestionMeta = (user) => {
+    const mutualConnectionsCount = Number(user.mutual_connections_count) || 0;
+
+    if (mutualConnectionsCount > 0) {
+        return `${mutualConnectionsCount} mutual ${mutualConnectionsCount === 1 ? 'connection' : 'connections'}`;
+    }
+
+    const followersCount = Number(user.followers_count) || 0;
+
+    return `${followersCount} ${followersCount === 1 ? 'follower' : 'followers'}`;
+};
+
 const handleAvatarError = (event, user) => {
     event.currentTarget.src = getFallbackAvatarUrl(user, 100);
 };
+
+onMounted(() => {
+    void loadProfileSuggestions();
+});
 </script>
 
 <template>
@@ -87,7 +142,43 @@ const handleAvatarError = (event, user) => {
             </button>
         </div>
 
-        <div v-if="loading" class="status-message">
+        <section v-if="showProfileSuggestions" class="suggestions-section" aria-labelledby="profile-suggestions-title">
+            <div class="suggestions-heading">
+                <p class="suggestions-kicker">DISCOVER</p>
+                <h2 id="profile-suggestions-title">Suggested profiles</h2>
+                <p>Find people to follow and keep your feed moving.</p>
+            </div>
+
+            <div v-if="loadingSuggestions" class="status-message suggestions-status" role="status">
+                <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: #6F5CFF;"></i>
+            </div>
+
+            <div v-else-if="suggestionsError" class="status-message error-state suggestions-status" role="alert">
+                <i class="fa-solid fa-triangle-exclamation fa-2xl" style="color: #ff8b8b; margin-bottom: 15px;"></i>
+                <p>{{ suggestionsError }}</p>
+            </div>
+
+            <div v-else-if="profileSuggestions.length > 0" class="results-grid">
+                <button
+                    v-for="user in profileSuggestions"
+                    :key="user.id"
+                    class="user-card glass-effect"
+                    @click="goToProfile(user.username)"
+                    :aria-label="`Open ${user.username}'s profile`"
+                >
+                    <img :src="getAvatarUrl(user)" class="card-avatar" alt="User avatar" @error="handleAvatarError($event, user)">
+                    <div class="card-info">
+                        <h3 class="card-username">@{{ user.username }}</h3>
+                        <p class="card-name">{{ user.name || 'Gravityly User' }}</p>
+                        <p class="suggestion-meta">{{ getSuggestionMeta(user) }}</p>
+                    </div>
+                </button>
+            </div>
+
+            <p v-else class="suggestions-empty">There are no new profiles to suggest right now.</p>
+        </section>
+
+        <div v-else-if="loading" class="status-message">
             <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: #6F5CFF;"></i>
         </div>
         
@@ -183,6 +274,45 @@ const handleAvatarError = (event, user) => {
     max-width: 900px;
 }
 
+.suggestions-section {
+    width: 100%;
+    max-width: 900px;
+}
+
+.suggestions-heading {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.suggestions-kicker {
+    margin: 0 0 0.35rem;
+    color: #FFC857;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+.suggestions-heading h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.65rem;
+}
+
+.suggestions-heading > p:last-child {
+    margin: 0.4rem 0 0;
+    color: #a8a8a8;
+}
+
+.suggestions-status {
+    margin-top: 1.5rem;
+}
+
+.suggestions-empty {
+    margin: 1.5rem 0 0;
+    color: #a8a8a8;
+    text-align: center;
+}
+
 .user-card {
     display: flex;
     flex-direction: column;
@@ -230,6 +360,12 @@ const handleAvatarError = (event, user) => {
     margin: 5px 0 0 0;
     color: #a8a8a8;
     font-size: 0.9rem;
+}
+
+.suggestion-meta {
+    margin: 0.45rem 0 0;
+    color: #C9C2E8;
+    font-size: 0.8rem;
 }
 
 .status-message {

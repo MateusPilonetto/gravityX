@@ -73,6 +73,32 @@ class ProfileController extends Controller
         return response()->json($users);
     }
 
+    public function suggestions(Request $request): JsonResponse
+    {
+        $currentUser = $request->user();
+        $followingIds = Follow::query()
+            ->where('follower_id', $currentUser->id)
+            ->select('following_id');
+        $mutualConnections = Follow::query()
+            ->selectRaw('count(*)')
+            ->whereColumn('follows.following_id', 'users.id')
+            ->whereIn('follows.follower_id', $followingIds);
+
+        $suggestions = User::query()
+            ->where('users.id', '!=', $currentUser->id)
+            ->whereNotIn('users.id', $followingIds)
+            ->withCount(['followers', 'posts'])
+            ->selectSub($mutualConnections, 'mutual_connections_count')
+            ->orderByDesc('mutual_connections_count')
+            ->orderByDesc('followers_count')
+            ->orderByDesc('posts_count')
+            ->orderBy('users.username')
+            ->limit(6)
+            ->get();
+
+        return UserResource::collection($suggestions)->response();
+    }
+
     public function follow(Request $request, string $username): JsonResponse
     {
         $currentUser = $request->user();

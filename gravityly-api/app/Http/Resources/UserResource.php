@@ -31,6 +31,10 @@ class UserResource extends JsonResource
             'posts_count' => $this->posts_count ?? 0,
             'followers_count' => $this->followers_count ?? 0,
             'following_count' => $this->following_count ?? 0,
+            'mutual_connections_count' => $this->when(
+                isset($this->mutual_connections_count),
+                $this->mutual_connections_count
+            ),
         ];
     }
 }
