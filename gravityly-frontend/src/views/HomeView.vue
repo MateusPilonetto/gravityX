@@ -70,7 +70,7 @@ onMounted(() => {
           Catch up with the people and ideas that keep your community moving.
         </p>
         <p class="feed-summary">
-          <i class="fa-solid fa-sparkles" aria-hidden="true"></i>
+          <i class="fa-solid fa-inbox" aria-hidden="true"></i>
           {{ feedSummary }}
         </p>
       </div>
@@ -683,6 +683,22 @@ onMounted(() => {
   .spinning {
     animation: none;
     transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-create-button {
+    min-width: 10rem;
+    padding: 0.50rem 0.70rem;
+    background: var(--gold);
+    color: #211934;
+    box-shadow: 0 12px 25px rgba(255, 200, 87, 0.22);
+  }
+
+  .feed-hero {
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 }
 </style>

@@ -88,9 +88,7 @@ const handleLogout = () => {
         <h1 class="logo-title">Gravityly</h1>
       </div>
       <section class="top-area">
-        <div class="buttons glass-effect">
-        <i class="fa-solid fa-bell fa-2xl notification-icon"></i>
-      </div>
+
       <div class="glass-effect buttons">
         <button type="button" @click="handleLogout" class="logout-button" aria-label="Log out">
           <i class="fa-solid fa-arrow-right-from-bracket"></i>
@@ -117,11 +115,7 @@ const handleLogout = () => {
           
           <router-link to="/posts/create" class="nav-link">
             <i class="fa-solid fa-square-plus nav-icon"></i>
-          </router-link>        
-          
-          <router-link to="/messages" class="nav-link">
-            <i class="fa-solid fa-message nav-icon"></i>
-          </router-link>        
+          </router-link>              
           
           <router-link to="/profile" class="nav-link">
             <img
@@ -190,24 +184,6 @@ header {
   border: 0;
   cursor: pointer;
   font-size: 1.25rem;
-}
-
-.notifications-area:hover {
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.notifications-area:hover .notification-icon {
-  color: #C9C2E8;
-}
-
-.notification-icon {
-  color: #6F5CFF;
-  transition: color 0.3s ease;
-  cursor: pointer;
 }
 
 .bottom-nav-wrapper {

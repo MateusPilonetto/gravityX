@@ -7,7 +7,6 @@ import UserProfileView from '../views/UserProfileView.vue';
 import EditProfileView from '../views/EditProfileView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 import SearchView from '../views/SearchView.vue';
-import MessagesView from '../views/MessagesView.vue';
 import CreatePostView from '../views/CreatePostView.vue';
 import PostDetailView from '../views/PostDetailView.vue';
 import { isAuthenticated } from '../services/api';
@@ -53,12 +52,6 @@ const routes = [
     path: '/search',
     name: 'search',
     component: SearchView,
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/messages',
-    name: 'messages',
-    component: MessagesView,
     meta: { requiresAuth: true },
   },
   {
