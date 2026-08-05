@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCommentRequest;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\CommentResource;
 use App\Http\Resources\PostResource;
+use App\Http\Resources\StoryAuthorResource;
 use App\Models\Post;
 use App\Models\User;
 use App\Services\PostService;
@@ -18,29 +19,33 @@ class PostController extends Controller
         private PostService $postService
     ) {}
 
-   public function index(Request $request): JsonResponse
-{
-    $user = $request->user();
-    
-    $posts = PostResource::collection(
-        $this->postService->listFor($user)
-    );
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
 
-    $followingIds = $user->following()->pluck('users.id');
+        $posts = PostResource::collection(
+            $this->postService->listFor($user)
+        );
 
-    $usersWithStories = User::whereIn('id', $followingIds)
-        ->whereHas('activeStories')
-        ->with(['activeStories' => function ($query) {
-            $query->orderBy('created_at', 'asc');
-        }])
-        ->get();
+        $storyAuthorIds = $user->following()
+            ->pluck('following_id')
+            ->prepend($user->id)
+            ->unique()
+            ->values();
 
-    return response()->json([
-        'message' => 'Feed recuperado com sucesso.',
-        'posts' => $posts,
-        'stories' => $usersWithStories,
-    ]);
-}
+        $usersWithStories = User::whereIn('id', $storyAuthorIds)
+            ->whereHas('activeStories')
+            ->with(['activeStories' => function ($query) {
+                $query->orderBy('created_at', 'asc');
+            }])
+            ->get();
+
+        return response()->json([
+            'message' => 'Feed recuperado com sucesso.',
+            'posts' => $posts,
+            'stories' => StoryAuthorResource::collection($usersWithStories),
+        ]);
+    }
 
     public function userPosts(Request $request, string $username): JsonResponse
     {

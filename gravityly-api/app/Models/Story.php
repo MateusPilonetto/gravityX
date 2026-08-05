@@ -2,17 +2,24 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use League\Uri\Builder;
 use Illuminate\Support\Facades\Storage;
 
 class Story extends Model
 {
     use Prunable;
-    protected $fillable = ['user_id', 'media_path', 'expires_at'];
-    protected $casts = ['expires_at' => 'datetime',];
+
+    protected $fillable = ['user_id', 'media_path', 'media_type', 'expires_at'];
+
+    protected $casts = ['expires_at' => 'datetime'];
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('expires_at', '>', now());
+    }
 
     public function prunable(): Builder
     {

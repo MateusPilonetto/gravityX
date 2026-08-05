@@ -3,12 +3,25 @@ import { computed, onMounted, ref } from 'vue';
 import PostCard from '../components/PostCard.vue';
 import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api';
 import { fetchPosts } from '../services/posts';
+import { uploadStory } from '../services/stories';
 import { userStore } from '../store';
+
+const MAX_STORY_MEDIA_SIZE_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_STORY_MEDIA_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+]);
 
 const posts = ref([]);
 const loading = ref(true);
 const errorMessage = ref('');
 const loadingPlaceholders = [1, 2, 3];
+const storyInput = ref(null);
+const uploadingStory = ref(false);
+const storyUploadStatus = ref('');
+const storyUploadError = ref('');
 
 const displayName = computed(() => {
   const name = userStore.currentUser?.name?.trim();
@@ -52,6 +65,75 @@ function handleAvatarError(event) {
   event.currentTarget.src = getFallbackAvatarUrl(userStore.currentUser, 96);
 }
 
+function resetStoryInput() {
+  if (storyInput.value) {
+    storyInput.value.value = '';
+  }
+}
+
+function validateStoryMedia(file) {
+  if (!ACCEPTED_STORY_MEDIA_TYPES.has(file.type)) {
+    return 'Choose a JPEG, PNG, WebP image, or MP4 video.';
+  }
+
+  if (file.size === 0) {
+    return 'The selected file is empty. Choose another file.';
+  }
+
+  if (file.size > MAX_STORY_MEDIA_SIZE_BYTES) {
+    return 'Stories must be 10 MB or smaller.';
+  }
+
+  return '';
+}
+
+function openStoryMediaPicker() {
+  if (uploadingStory.value) {
+    return;
+  }
+
+  storyUploadStatus.value = '';
+  storyUploadError.value = '';
+  storyInput.value?.click();
+}
+
+async function handleStoryMediaSelection(event) {
+  const [file] = event.target.files || [];
+
+  if (!file) {
+    return;
+  }
+
+  const validationMessage = validateStoryMedia(file);
+
+  if (validationMessage) {
+    storyUploadError.value = validationMessage;
+    resetStoryInput();
+    return;
+  }
+
+  uploadingStory.value = true;
+  storyUploadStatus.value = '';
+  storyUploadError.value = '';
+
+  try {
+    await uploadStory(file);
+    storyUploadStatus.value = 'Your story is live for the next 24 hours.';
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
+      return;
+    }
+
+    console.error('Failed to upload story:', errorResponse);
+    storyUploadError.value = errorResponse.firstMessage?.()
+      || errorResponse.message
+      || 'Could not upload the story.';
+  } finally {
+    uploadingStory.value = false;
+    resetStoryInput();
+  }
+}
+
 onMounted(() => {
   void loadPosts();
 });
@@ -61,6 +143,44 @@ onMounted(() => {
   <div class="feed-page">
     <span class="ambient-orb ambient-orb-primary" aria-hidden="true"></span>
     <span class="ambient-orb ambient-orb-secondary" aria-hidden="true"></span>
+
+    <section class="stories-container" aria-label="Stories">
+      <button
+        type="button"
+        class="story-upload-button"
+        :disabled="uploadingStory"
+        :aria-busy="uploadingStory"
+        aria-describedby="story-upload-hint"
+        @click="openStoryMediaPicker"
+      >
+        <span class="story-avatar-frame">
+          <img
+            :src="avatarUrl"
+            class="story-avatar"
+            alt="Your profile photo"
+            @error="handleAvatarError"
+          >
+          <span class="plus-icon" aria-hidden="true">
+            <i :class="uploadingStory ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plus'"></i>
+          </span>
+        </span>
+        <span class="story-upload-copy">
+          <strong>{{ uploadingStory ? 'Uploading story…' : 'Add a story' }}</strong>
+          <small>Share an image or video</small>
+        </span>
+      </button>
+      <input
+        ref="storyInput"
+        class="story-file-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,video/mp4"
+        :disabled="uploadingStory"
+        @change="handleStoryMediaSelection"
+      >
+      <p id="story-upload-hint" class="story-upload-hint">JPEG, PNG, WebP, or MP4 · 10 MB max</p>
+      <p v-if="storyUploadStatus" class="story-upload-status" role="status">{{ storyUploadStatus }}</p>
+      <p v-if="storyUploadError" class="story-upload-error" role="alert">{{ storyUploadError }}</p>
+    </section>
 
     <section class="feed-hero" aria-labelledby="feed-title">
       <div class="hero-copy">
@@ -170,6 +290,112 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.stories-container {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.story-upload-button {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.story-upload-button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.story-upload-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.story-avatar-frame {
+  position: relative;
+  display: block;
+  width: 4rem;
+  height: 4rem;
+}
+
+.story-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(255, 200, 87, 0.7);
+  border-radius: 50%;
+  object-fit: cover;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.story-upload-button:hover:not(:disabled) .story-avatar {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+}
+
+.plus-icon {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  place-items: center;
+  border: 2px solid #211934;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #211934;
+  font-size: 0.7rem;
+}
+
+.story-upload-copy {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.story-upload-copy strong {
+  font-size: 0.9rem;
+}
+
+.story-upload-copy small,
+.story-upload-hint,
+.story-upload-status,
+.story-upload-error {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.story-upload-copy small,
+.story-upload-hint {
+  color: var(--muted);
+}
+
+.story-upload-hint {
+  margin-left: 4.7rem;
+}
+
+.story-upload-status {
+  color: #a7e6bd;
+}
+
+.story-upload-error {
+  color: #ffabab;
+}
+
+.story-file-input {
+  display: none;
+}
+
 .feed-page {
   --surface: rgba(35, 27, 56, 0.82);
   --surface-raised: rgba(47, 37, 75, 0.9);

@@ -65,13 +65,13 @@ class User extends Authenticatable
         return $this->hasMany(Follow::class, 'follower_id');
     }
 
-    public function stories() 
+    public function stories(): HasMany
     {
         return $this->hasMany(Story::class);
     }
 
-    public function activeStories()
+    public function activeStories(): HasMany
     {
-        return $this->hasMany(Story::class)->where('expires_at', '>', now());
+        return $this->stories()->active();
     }
 }

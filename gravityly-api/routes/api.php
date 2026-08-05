@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StoryController;
 use Illuminate\Support\Facades\Route;
 
 $usernamePattern = '[^/]+';
@@ -15,6 +16,7 @@ Route::middleware('auth:sanctum')->group(function () use ($usernamePattern) {
     Route::get('/me', [ProfileController::class, 'show']);
     Route::put('/me', [ProfileController::class, 'update']);
     Route::get('/search', [ProfileController::class, 'search']);
+    Route::post('/stories', [StoryController::class, 'store']);
 
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);

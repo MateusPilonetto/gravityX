@@ -38,4 +38,4 @@ RUN composer dump-autoload --optimize \
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "set -ex; php artisan optimize:clear; mkdir -p storage/app/public; php artisan storage:link --force; php artisan migrate --force; exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+CMD ["sh", "-c", "set -ex; php artisan optimize:clear; mkdir -p storage/app/public; php artisan storage:link --force; php artisan migrate --force; php artisan schedule:work & exec php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
