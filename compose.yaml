@@ -1,0 +1,49 @@
+name: gravityx
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: gravityX-api/Dockerfile
+    command: ["sh", "/var/www/docker/entrypoint.local.sh"]
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:8080
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/db/database.sqlite
+      FILESYSTEM_DISK: public
+      PORT: "8000"
+      LOG_CHANNEL: stderr
+    volumes:
+      - sqlite_data:/var/db
+      - storage_data:/var/www/storage/app/public
+      - app_state:/var/app-state
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8000/up >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./gravityX-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
+  storage_data:
+  app_state:

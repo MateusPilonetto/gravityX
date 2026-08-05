@@ -1,9 +1,0 @@
-services:
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: gravityly-frontend
-    ports:
-      - "8080:80" # Accessible in the browser via localhost:8080
-    restart: unless-stopped

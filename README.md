@@ -1,53 +1,79 @@
-# Gravityly - Instagram Clone 📸
+# GravityX
 
-Final project for the web development module. Gravityly is a full-stack web application inspired by Instagram, reproducing its core social interactions and navigation experiences. 
+GravityX é uma aplicação social full-stack, com frontend em Vue e uma API REST em Laravel.
 
-This repository is a monorepo containing both the Frontend (Vue.js) and the Backend (Laravel REST API), fully containerized with Docker.
+## Estrutura
 
-## 📂 Project Structure
+- `gravityX-frontend/`: aplicação Vue 3 + Vite.
+- `gravityX-api/`: API Laravel e migrations do banco.
 
-* **`/gravityly-frontend`**: Vue 3 + Vite application (Single Page Application).
-* **`/gravityly-api`**: Laravel 13 REST API with MSC architecture.
+## Iniciar com Docker (recomendado)
 
-> **Note:** Each directory contains its own detailed `README.md` with specific instructions for that environment.
+Pré-requisito: Docker com o plugin Docker Compose instalado.
 
-## 🛠 Tech Stack
-
-* **Frontend:** Vue.js 3 (Composition API), Vue Router, Vite.
-* **Backend:** PHP, Laravel, Laravel Sanctum (Authentication).
-* **Database:** SQLite (Configured for local development).
-* **Infrastructure:** Docker, Docker Compose, Nginx.
-
-## 🚀 Quick Start (How to run the entire project)
-
-Ensure you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed on your machine.
-
-### 1. Starting the Backend (API & Database)
-Open your terminal and execute the following commands to spin up the API:
+Na raiz do repositório, execute:
 
 ```bash
-cd gravityly-api
-cp .env.example .env
-docker compose -f compose.dev.yaml up -d --build
-docker compose -f compose.dev.yaml exec app composer install
-docker compose -f compose.dev.yaml exec app php artisan key:generate
-docker compose -f compose.dev.yaml exec app php artisan storage:link
-# Migrations run automatically when the development container starts.
-# To apply pending migrations without resetting local data:
-docker compose -f compose.dev.yaml exec app php artisan migrate --force
-```
-
-The API will be available at `http://localhost:8000`.
-
-### 2. Starting the Frontend
-In a separate terminal, from the project root:
-
-```bash
-cd gravityly-frontend
-cp .env.example .env
 docker compose up -d --build
 ```
 
-The app will be available at `http://localhost:8080`.
+O ambiente completo fica disponível em:
 
-> **Tip:** while actively developing the frontend, running it directly with `npm install && npm run dev` (instead of through Docker) gives you hot-reload on `http://localhost:5173`.
+- Frontend: `http://localhost:8080`
+- API: `http://localhost:8000`
+
+O Compose usa SQLite em um volume nomeado. Na primeira execução ele cria a chave da aplicação, o banco, aplica as migrations e cria o link de arquivos públicos automaticamente. Não é necessário criar arquivos `.env` para essa forma de uso.
+
+Comandos úteis:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose down
+```
+
+As portas `8000` e `8080` precisam estar livres. Para apagar também os dados locais do Docker e começar do zero, use o comando abaixo — ele é destrutivo para os dados locais do GravityX:
+
+```bash
+docker compose down -v
+```
+
+## Iniciar sem Docker
+
+Use dois terminais. O backend usa SQLite local e o frontend se conecta à API em `http://localhost:8000/api` por padrão.
+
+No primeiro terminal:
+
+```bash
+cd gravityX-api
+cp .env.example .env
+touch database/database.sqlite
+composer install
+php artisan key:generate
+php artisan migrate
+php artisan storage:link
+php artisan serve
+```
+
+No segundo terminal:
+
+```bash
+cd gravityX-frontend
+cp .env.example .env
+npm ci
+npm run dev
+```
+
+O frontend de desenvolvimento ficará em `http://localhost:5173`.
+
+## Produção no Render
+
+O projeto mantém SQLite para o desenvolvimento local e aceita PostgreSQL em produção. Para a API, use o Dockerfile `gravityX-api/Dockerfile` com o contexto de build na raiz do repositório, pois ele copia arquivos a partir dela. Configure ao menos:
+
+- `APP_ENV=production` e `APP_DEBUG=false`
+- `APP_KEY` (gere uma vez com `php artisan key:generate --show`)
+- `APP_URL` com a URL pública da API
+- `FRONTEND_URL` com a URL pública do frontend
+- `DB_CONNECTION=pgsql` e `DATABASE_URL` fornecida pelo PostgreSQL
+
+Para o frontend, publique `gravityX-frontend` como site estático, com `npm ci && npm run build` e diretório de publicação `dist`. Defina `VITE_API_URL` durante o build como `https://<sua-api>/api`; sem essa variável, o frontend de produção tentará usar a API local.
