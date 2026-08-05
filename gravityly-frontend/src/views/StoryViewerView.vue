@@ -20,6 +20,8 @@ const errorMessage = ref('');
 const mediaFailed = ref(false);
 const deletingStory = ref(false);
 const deleteError = ref('');
+const storyVideo = ref(null);
+const isVideoMuted = ref(true);
 
 const currentStory = computed(() => stories.value[currentIndex.value] || null);
 const currentAuthor = computed(() => currentStory.value?.user || null);
@@ -60,6 +62,7 @@ function findStoryIndex(storyId) {
 function resetMediaState() {
   mediaFailed.value = false;
   deleteError.value = '';
+  isVideoMuted.value = true;
 }
 
 function selectStory(index, updateRoute = true) {
@@ -135,6 +138,36 @@ function handleKeydown(event) {
 
 function handleMediaError() {
   mediaFailed.value = true;
+}
+
+async function toggleVideoSound() {
+  const video = storyVideo.value;
+
+  if (!video) {
+    return;
+  }
+
+  if (!video.muted) {
+    video.muted = true;
+    isVideoMuted.value = true;
+    return;
+  }
+
+  video.muted = false;
+  isVideoMuted.value = false;
+
+  try {
+    await video.play();
+  } catch {
+    if (storyVideo.value === video) {
+      video.muted = true;
+      isVideoMuted.value = true;
+    }
+  }
+}
+
+function handleVideoVolumeChange(event) {
+  isVideoMuted.value = event.currentTarget.muted;
 }
 
 function handleAvatarError(event) {
@@ -271,13 +304,15 @@ onBeforeUnmount(() => {
       <video
         v-else-if="isVideo && !mediaFailed"
         :key="currentStory.id"
+        ref="storyVideo"
         class="story-media"
         :src="currentMediaUrl"
         autoplay
-        muted
+        :muted="isVideoMuted"
         playsinline
         @ended="goNext"
         @error="handleMediaError"
+        @volumechange="handleVideoVolumeChange"
       ></video>
       <div v-else class="media-unavailable" role="status">
         <i class="fa-solid fa-image" aria-hidden="true"></i>
@@ -308,6 +343,16 @@ onBeforeUnmount(() => {
           >
         </div>
         <div class="story-header-actions">
+          <button
+            v-if="isVideo && !mediaFailed"
+            type="button"
+            class="sound-story-button"
+            :aria-label="isVideoMuted ? 'Ativar som do vídeo' : 'Desativar som do vídeo'"
+            :aria-pressed="!isVideoMuted"
+            @click.stop="toggleVideoSound"
+          >
+            <i :class="isVideoMuted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'" aria-hidden="true"></i>
+          </button>
           <button
             v-if="canDeleteCurrentStory"
             type="button"
@@ -498,6 +543,7 @@ onBeforeUnmount(() => {
 
 .close-story-button,
 .delete-story-button,
+.sound-story-button,
 .story-direction {
   display: grid;
   width: 2.35rem;
@@ -516,6 +562,7 @@ onBeforeUnmount(() => {
 
 .close-story-button:hover,
 .delete-story-button:hover:not(:disabled),
+.sound-story-button:hover,
 .story-direction:hover:not(:disabled) {
   background: rgba(111, 92, 255, 0.68);
   transform: scale(1.06);
@@ -523,6 +570,7 @@ onBeforeUnmount(() => {
 
 .close-story-button:focus-visible,
 .delete-story-button:focus-visible,
+.sound-story-button:focus-visible,
 .story-direction:focus-visible,
 .viewer-return-button:focus-visible {
   outline: 2px solid #ffc857;
@@ -680,6 +728,7 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .close-story-button,
   .delete-story-button,
+  .sound-story-button,
   .story-direction {
     transition: none;
   }
