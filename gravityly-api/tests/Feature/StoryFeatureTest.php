@@ -2,8 +2,10 @@
 
 use App\Models\Story;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
@@ -169,4 +171,24 @@ it('prunes expired stories and their stored media', function () {
     $this->assertDatabaseHas('stories', ['id' => $activeStory->id]);
     Storage::disk('public')->assertMissing($expiredPath);
     Storage::disk('public')->assertExists($activePath);
+});
+
+it('upgrades a legacy stories table that is missing the media type column', function () {
+    Schema::table('stories', function (Blueprint $table) {
+        $table->dropColumn('media_type');
+    });
+
+    expect(Schema::hasColumn('stories', 'media_type'))->toBeFalse();
+
+    $migration = require database_path('migrations/2026_08_05_000001_add_media_type_to_stories_table.php');
+    $migration->up();
+
+    expect(Schema::hasColumn('stories', 'media_type'))->toBeTrue();
+
+    $story = User::factory()->create()->stories()->create([
+        'media_path' => 'stories/legacy.png',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    expect($story->fresh()->media_type)->toBe('image');
 });
