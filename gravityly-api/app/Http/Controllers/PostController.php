@@ -18,28 +18,29 @@ class PostController extends Controller
         private PostService $postService
     ) {}
 
-    public function index(Request $request): JsonResponse
-    {
-        return response()->json([
-            'message' => 'Posts retrieved successfully.',
-            'posts' => PostResource::collection(
-                $this->postService->listFor($request->user())
-            ),
-        ]);
+   public function index(Request $request): JsonResponse
+{
+    $user = $request->user();
+    
+    $posts = PostResource::collection(
+        $this->postService->listFor($user)
+    );
 
-        $user = $request->user();
+    $followingIds = $user->following()->pluck('users.id');
 
-        $followingIds = $user->following()->pluck('users.id');
+    $usersWithStories = User::whereIn('id', $followingIds)
+        ->whereHas('activeStories')
+        ->with(['activeStories' => function ($query) {
+            $query->orderBy('created_at', 'asc');
+        }])
+        ->get();
 
-        $usersWithStories = User::whereIn('id', $followingIds)
-            ->whereHas('activeStories')
-            ->with(['activeStories' => function ($query) {
-                $query->orderBy('created_at', 'asc');
-            }])
-            ->get();
-
-        return response()->json($usersWithStories);
-    }
+    return response()->json([
+        'message' => 'Feed recuperado com sucesso.',
+        'posts' => $posts,
+        'stories' => $usersWithStories,
+    ]);
+}
 
     public function userPosts(Request $request, string $username): JsonResponse
     {
