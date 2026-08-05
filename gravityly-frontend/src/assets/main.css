@@ -36,7 +36,7 @@ a:hover {
   font-family: var(--font-display);
 }
 
-p, input, button, a, textarea, label, span, small, strong {
+p, input, button, a, textarea, label, span, small, strong, li {
   font-family: var(--font-body);
 }
 

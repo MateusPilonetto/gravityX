@@ -133,9 +133,6 @@ const handleLogout = () => {
             <h2 class="username">{{ profileUser.username }}</h2>
             
             <router-link to="/profile/edit" class="btn-edit">Edit profile</router-link>
-            <button type="button" @click="handleLogout" class="settings-icon" title="Log out" aria-label="Log out">
-              <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </button>
           </div>
 
           <ul class="info-stats">
@@ -147,7 +144,7 @@ const handleLogout = () => {
           <div class="info-bio">
             <h1 class="fullname">{{ profileUser.name || profileUser.username }}</h1>
             <div class="bio-text">
-              {{ profileUser.bio || 'Add a bio in Edit Profile.' }}
+              <p>{{ profileUser.bio || 'Add a bio in Edit Profile.' }}</p>
             </div>
           </div>
         </section>
@@ -155,7 +152,6 @@ const handleLogout = () => {
 
       <div class="profile-tabs">
         <span class="tab active-tab"><i class="fa-solid fa-table-cells"></i> POSTS</span>
-        <span class="tab"><i class="fa-regular fa-bookmark"></i> SAVED</span>
       </div>
 
       <div class="posts-grid">
@@ -193,31 +189,199 @@ const handleLogout = () => {
 </template>
 
 <style scoped>
-.profile-container { max-width: 935px; margin: 0 auto; padding: 30px 20px 80px 20px; color: #fff; }
-.center-message { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 60vh; text-align: center; }
-.error-box { background: rgba(255, 93, 93, 0.1); border: 1px solid rgba(255, 93, 93, 0.3); border-radius: 12px; padding: 30px; max-width: 400px; margin: 0 auto; }
-.btn-back { background-color: transparent; color: #fff; border: 1px solid #6F5CFF; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-.profile-header { display: flex; margin-bottom: 44px; }
-.profile-avatar-container { flex: 1; display: flex; justify-content: center; margin-right: 30px; }
-.profile-avatar { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(111, 92, 255, 0.5); }
-.profile-info { flex: 2; display: flex; flex-direction: column; }
-.info-top { display: flex; align-items: center; margin-bottom: 20px; gap: 15px; }
-.username { font-size: 1.25rem; font-weight: 500; margin: 0; color: #C9C2E8; }
-.btn-edit { background-color: rgba(255, 255, 255, 0.1); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: bold; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
-.settings-icon { color: #ff5d5d; font-size: 1.2rem; background: transparent; border: 0; cursor: pointer; }
-.info-stats { display: flex; list-style: none; padding: 0; margin: 0 0 20px 0; gap: 40px; }
-.stat-count { font-weight: bold; color: #FFC857; }
-.info-bio { font-size: 0.95rem; line-height: 1.5; }
-.fullname { font-weight: bold; font-size: 1.05rem; margin: 0 0 5px 0; }
-.bio-text { white-space: pre-wrap; color: #C9C2E8; }
-.profile-tabs { display: flex; justify-content: center; border-top: 1px solid rgba(255, 255, 255, 0.1); gap: 60px; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 15px 0; color: #a8a8a8; font-size: 12px; font-weight: bold; text-decoration: none; }
-.active-tab { color: #fff; border-top: 1px solid #FFC857; margin-top: -1px; }
-.posts-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.posts-list { display: grid; gap: 16px; }
-.empty-posts, .posts-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: #C9C2E8; text-align: center; }
-.posts-state { gap: 12px; }
-.posts-state p { margin: 0; }
-.posts-error { color: #ff9e9e; }
-.posts-retry-button { border: 1px solid #6F5CFF; border-radius: 8px; padding: 8px 14px; background: transparent; color: #fff; cursor: pointer; font-weight: bold; }
+.profile-container { 
+  max-width: 935px; 
+  margin: 0 auto; 
+  padding: 30px 20px 80px 20px; 
+  color: #fff; 
+}
+.center-message { 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center; 
+  height: 60vh; 
+  text-align: center; 
+}
+.error-box { 
+  background: rgba(255, 93, 93, 0.1); 
+  border: 1px solid rgba(255, 93, 93, 0.3); 
+  border-radius: 12px; 
+  padding: 30px; 
+  max-width: 400px; 
+  margin: 0 auto; 
+}
+.btn-back { 
+  background-color: transparent; 
+  color: #fff; border: 1px solid #6F5CFF; 
+  padding: 10px 20px; 
+  border-radius: 8px; 
+  font-weight: bold; 
+  cursor: pointer; 
+  margin-top: 15px; 
+}
+.profile-header { 
+  display: flex; 
+  margin-bottom: 44px; 
+}
+.profile-avatar-container { 
+  flex: 1; 
+  display: flex; 
+  justify-content: center; 
+  margin-right: 30px; 
+}
+.profile-avatar { 
+  width: 150px; 
+  height: 150px; 
+  border-radius: 50%; 
+  object-fit: cover; 
+  border: 2px solid rgba(111, 92, 255, 0.5); 
+}
+.profile-info {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-top {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 15px;
+}
+
+.username {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin: 0;
+  color: #C9C2E8;
+}
+
+.btn-edit {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.settings-icon {
+  color: #ff5d5d;
+  font-size: 1.2rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.info-stats {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+  gap: 40px;
+}
+
+.stat-count {
+  font-weight: bold;
+  color: #FFC857;
+}
+
+.info-bio {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.fullname {
+  font-weight: bold;
+  font-size: 1.05rem;
+  margin: 0 0 5px 0;
+}
+
+.bio-text {
+  white-space: pre-wrap;
+  color: #C9C2E8;
+}
+
+.profile-tabs {
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 60px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 15px 0;
+  color: #a8a8a8;
+  font-size: 12px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.active-tab {
+  color: #fff;
+  border-top: 1px solid #FFC857;
+  margin-top: -1px;
+}
+
+.posts-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.posts-list {
+  display: grid;
+  gap: 16px;
+}
+
+.empty-posts, .posts-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #C9C2E8;
+  text-align: center;
+}
+
+.posts-state {
+  gap: 12px;
+}
+
+.posts-state p {
+  margin: 0;
+}
+
+.posts-error {
+  color: #ff9e9e;
+}
+
+.posts-retry-button {
+  border: 1px solid #6F5CFF;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+@media (max-width: 600px) {
+ .profile-header {
+  display: flex;
+  flex-direction: column;
+ } 
+
+ .info-top {
+  display: flex;
+  justify-content: space-between;
+ }
+}
 </style>
