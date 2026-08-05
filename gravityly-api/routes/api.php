@@ -17,6 +17,7 @@ Route::middleware('auth:sanctum')->group(function () use ($usernamePattern) {
     Route::put('/me', [ProfileController::class, 'update']);
     Route::get('/search', [ProfileController::class, 'search']);
     Route::post('/stories', [StoryController::class, 'store']);
+    Route::delete('/stories/{story}', [StoryController::class, 'destroy']);
 
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);

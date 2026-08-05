@@ -17,3 +17,11 @@ export async function uploadStory(media) {
 
   return story;
 }
+
+export async function deleteStory(storyId) {
+  if (storyId === null || storyId === undefined || storyId === '') {
+    throw new TypeError('A story identifier is required to delete a story.');
+  }
+
+  await api.delete(`/stories/${encodeURIComponent(storyId)}`);
+}

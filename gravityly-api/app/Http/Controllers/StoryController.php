@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreStoryRequest;
 use App\Http\Resources\StoryResource;
+use App\Models\Story;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -48,5 +50,28 @@ class StoryController extends Controller
                 'message' => 'An error occurred while publishing the story. Please try again later.',
             ], 500);
         }
+    }
+
+    public function destroy(Request $request, Story $story): JsonResponse
+    {
+        if ($request->user()->id !== $story->user_id) {
+            return response()->json([
+                'message' => 'You are not allowed to delete this story.',
+            ], 403);
+        }
+
+        $mediaPath = $story->media_path;
+
+        $story->delete();
+
+        try {
+            Storage::disk('public')->delete($mediaPath);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        return response()->json([
+            'message' => 'Story deleted successfully.',
+        ]);
     }
 }

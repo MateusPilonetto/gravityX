@@ -19,10 +19,12 @@ const storyGroups = ref([]);
 const loading = ref(true);
 const errorMessage = ref('');
 const loadingPlaceholders = [1, 2, 3];
-const storyInput = ref(null);
+const storyGalleryInput = ref(null);
+const storyCameraInput = ref(null);
 const uploadingStory = ref(false);
 const storyUploadStatus = ref('');
 const storyUploadError = ref('');
+const isStorySourceChooserOpen = ref(false);
 
 const displayName = computed(() => {
   const name = userStore.currentUser?.name?.trim();
@@ -194,7 +196,6 @@ onMounted(() => {
           </span>
           <span class="story-upload-copy">
             <strong>{{ uploadingStory ? 'Uploading story…' : 'Add a story' }}</strong>
-            <small>Share an image or video</small>
           </span>
         </button>
 
@@ -224,7 +225,6 @@ onMounted(() => {
         :disabled="uploadingStory"
         @change="handleStoryMediaSelection"
       >
-      <p id="story-upload-hint" class="story-upload-hint">JPEG, PNG, WebP, or MP4 · 10 MB max</p>
       <p v-if="storyUploadStatus" class="story-upload-status" role="status">{{ storyUploadStatus }}</p>
       <p v-if="storyUploadError" class="story-upload-error" role="alert">{{ storyUploadError }}</p>
     </section>

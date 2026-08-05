@@ -3,6 +3,7 @@
 use App\Models\Story;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +17,90 @@ it('requires authentication to publish a story', function () {
         'media' => UploadedFile::fake()->image('story.png'),
     ], ['Accept' => 'application/json'])
         ->assertUnauthorized();
+});
+
+it('requires authentication to delete a story', function () {
+    $story = User::factory()->create()->stories()->create([
+        'media_path' => 'stories/story.png',
+        'media_type' => 'image',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $this->deleteJson("/api/stories/{$story->id}")
+        ->assertUnauthorized();
+
+    $this->assertDatabaseHas('stories', ['id' => $story->id]);
+});
+
+it('deletes an authenticated user\'s story and its stored media', function () {
+    Storage::fake('public');
+    $author = User::factory()->create();
+    $mediaPath = 'stories/to-delete.png';
+    Storage::disk('public')->put($mediaPath, 'story media');
+    $story = $author->stories()->create([
+        'media_path' => $mediaPath,
+        'media_type' => 'image',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    Sanctum::actingAs($author);
+
+    $this->deleteJson("/api/stories/{$story->id}")
+        ->assertOk()
+        ->assertJsonPath('message', 'Story deleted successfully.');
+
+    $this->assertDatabaseMissing('stories', ['id' => $story->id]);
+    Storage::disk('public')->assertMissing($mediaPath);
+});
+
+it('does not allow a user to delete another user\'s story', function () {
+    Storage::fake('public');
+    $author = User::factory()->create();
+    $viewer = User::factory()->create();
+    $mediaPath = 'stories/other-user.png';
+    Storage::disk('public')->put($mediaPath, 'story media');
+    $story = $author->stories()->create([
+        'media_path' => $mediaPath,
+        'media_type' => 'image',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    Sanctum::actingAs($viewer);
+
+    $this->deleteJson("/api/stories/{$story->id}")
+        ->assertForbidden()
+        ->assertJsonPath('message', 'You are not allowed to delete this story.');
+
+    $this->assertDatabaseHas('stories', ['id' => $story->id]);
+    Storage::disk('public')->assertExists($mediaPath);
+});
+
+it('keeps a successful story deletion successful when media cleanup fails', function () {
+    $author = User::factory()->create();
+    $mediaPath = 'stories/unavailable-media.png';
+    $story = $author->stories()->create([
+        'media_path' => $mediaPath,
+        'media_type' => 'image',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    Sanctum::actingAs($author);
+
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('delete')
+        ->once()
+        ->with($mediaPath)
+        ->andThrow(new RuntimeException('The media disk is unavailable.'));
+    Storage::shouldReceive('disk')
+        ->once()
+        ->with('public')
+        ->andReturn($disk);
+
+    $this->deleteJson("/api/stories/{$story->id}")
+        ->assertOk()
+        ->assertJsonPath('message', 'Story deleted successfully.');
+
+    $this->assertDatabaseMissing('stories', ['id' => $story->id]);
 });
 
 it('uploads an image story for the authenticated user', function () {

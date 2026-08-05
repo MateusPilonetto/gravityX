@@ -7,6 +7,8 @@ import {
   getFallbackAvatarUrl,
   getProfileAvatarUrl,
 } from '../services/api';
+import { deleteStory } from '../services/stories';
+import { userStore } from '../store';
 
 const route = useRoute();
 const router = useRouter();
@@ -16,6 +18,8 @@ const currentIndex = ref(-1);
 const loading = ref(true);
 const errorMessage = ref('');
 const mediaFailed = ref(false);
+const deletingStory = ref(false);
+const deleteError = ref('');
 
 const currentStory = computed(() => stories.value[currentIndex.value] || null);
 const currentAuthor = computed(() => currentStory.value?.user || null);
@@ -23,6 +27,10 @@ const currentMediaUrl = computed(() => getApiAssetUrl(currentStory.value?.media_
 const isVideo = computed(() => currentStory.value?.media_type === 'video');
 const canGoPrevious = computed(() => currentIndex.value > 0);
 const canGoNext = computed(() => currentIndex.value >= 0 && currentIndex.value < stories.value.length - 1);
+const canDeleteCurrentStory = computed(() => (
+  currentAuthor.value?.id != null
+  && String(currentAuthor.value.id) === String(userStore.currentUser?.id)
+));
 
 function getArrayPayload(responsePayload, key) {
   const value = responsePayload?.[key] ?? responsePayload?.data?.[key];
@@ -51,6 +59,7 @@ function findStoryIndex(storyId) {
 
 function resetMediaState() {
   mediaFailed.value = false;
+  deleteError.value = '';
 }
 
 function selectStory(index, updateRoute = true) {
@@ -74,12 +83,16 @@ function closeViewer() {
 }
 
 function goPrevious() {
-  if (canGoPrevious.value) {
+  if (!deletingStory.value && canGoPrevious.value) {
     selectStory(currentIndex.value - 1);
   }
 }
 
 function goNext() {
+  if (deletingStory.value) {
+    return;
+  }
+
   if (canGoNext.value) {
     selectStory(currentIndex.value + 1);
     return;
@@ -128,20 +141,49 @@ function handleAvatarError(event) {
   event.currentTarget.src = getFallbackAvatarUrl(currentAuthor.value, 72);
 }
 
-function formatStoryTime(dateValue) {
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Now';
+async function deleteCurrentStory() {
+  if (!currentStory.value || !canDeleteCurrentStory.value || deletingStory.value) {
+    return;
   }
 
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  const deletedStoryId = currentStory.value.id;
 
-  if (minutes < 1) return 'Now';
-  if (minutes < 60) return `${minutes}m`;
+  if (!window.confirm('Delete this story? This action cannot be undone.')) {
+    return;
+  }
 
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h`;
+  deletingStory.value = true;
+  deleteError.value = '';
+
+  try {
+    await deleteStory(deletedStoryId);
+
+    const deletedStoryIndex = stories.value.findIndex((story) => (
+      String(story.id) === String(deletedStoryId)
+    ));
+
+    if (deletedStoryIndex === -1) {
+      return;
+    }
+
+    stories.value.splice(deletedStoryIndex, 1);
+
+    if (stories.value.length === 0) {
+      closeViewer();
+      return;
+    }
+
+    selectStory(Math.min(deletedStoryIndex, stories.value.length - 1));
+  } catch (errorResponse) {
+    if (errorResponse.status !== 401) {
+      console.error('Failed to delete story:', errorResponse);
+      deleteError.value = errorResponse.firstMessage?.()
+        || errorResponse.message
+        || 'Could not delete this story.';
+    }
+  } finally {
+    deletingStory.value = false;
+  }
 }
 
 async function loadStories() {
@@ -264,21 +306,32 @@ onBeforeUnmount(() => {
             :alt="`${currentAuthor?.name || currentAuthor?.username || 'User'}'s profile photo`"
             @error="handleAvatarError"
           >
-          <div>
-            <strong>{{ currentAuthor?.name || currentAuthor?.username }}</strong>
-            <span>{{ formatStoryTime(currentStory.created_at) }}</span>
-          </div>
         </div>
-        <button type="button" class="close-story-button" aria-label="Close stories" @click="closeViewer">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-        </button>
+        <div class="story-header-actions">
+          <button
+            v-if="canDeleteCurrentStory"
+            type="button"
+            class="delete-story-button"
+            :disabled="deletingStory"
+            :aria-busy="deletingStory"
+            aria-label="Delete this story"
+            @click="deleteCurrentStory"
+          >
+            <i :class="deletingStory ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-trash-can'" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="close-story-button" aria-label="Close stories" @click="closeViewer">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
+
+      <p v-if="deleteError" class="story-delete-error" role="alert" @click.stop>{{ deleteError }}</p>
 
       <div class="story-navigation" aria-label="Story navigation" @click.stop>
         <button
           type="button"
           class="story-direction story-direction-previous"
-          :disabled="!canGoPrevious"
+          :disabled="!canGoPrevious || deletingStory"
           aria-label="Previous story"
           @click="goPrevious"
         >
@@ -287,6 +340,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="story-direction story-direction-next"
+          :disabled="deletingStory"
           aria-label="Next story"
           @click="goNext"
         >
@@ -425,9 +479,7 @@ onBeforeUnmount(() => {
 
 .story-author {
   display: flex;
-  min-width: 0;
   align-items: center;
-  gap: 0.6rem;
 }
 
 .story-author-avatar {
@@ -439,30 +491,13 @@ onBeforeUnmount(() => {
   object-fit: cover;
 }
 
-.story-author div {
-  display: grid;
-  min-width: 0;
-  gap: 0.08rem;
-}
-
-.story-author strong,
-.story-author span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.story-author strong {
-  font-size: 0.86rem;
-}
-
-.story-author span,
 .story-counter {
   color: rgba(255, 255, 255, 0.74);
   font-size: 0.72rem;
 }
 
 .close-story-button,
+.delete-story-button,
 .story-direction {
   display: grid;
   width: 2.35rem;
@@ -480,16 +515,52 @@ onBeforeUnmount(() => {
 }
 
 .close-story-button:hover,
+.delete-story-button:hover:not(:disabled),
 .story-direction:hover:not(:disabled) {
   background: rgba(111, 92, 255, 0.68);
   transform: scale(1.06);
 }
 
 .close-story-button:focus-visible,
+.delete-story-button:focus-visible,
 .story-direction:focus-visible,
 .viewer-return-button:focus-visible {
   outline: 2px solid #ffc857;
   outline-offset: 3px;
+}
+
+.delete-story-button {
+  color: #ffb0b0;
+}
+
+.delete-story-button:hover:not(:disabled) {
+  background: rgba(185, 55, 72, 0.72);
+  color: #fff;
+}
+
+.delete-story-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.story-header-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.story-delete-error {
+  position: absolute;
+  z-index: 2;
+  top: 4.25rem;
+  right: 0.85rem;
+  left: 0.85rem;
+  margin: 0;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(114, 24, 36, 0.8);
+  color: #fff;
+  font-size: 0.75rem;
+  text-align: center;
 }
 
 .story-navigation {
@@ -583,6 +654,12 @@ onBeforeUnmount(() => {
     left: 0.75rem;
   }
 
+  .story-delete-error {
+    top: max(4.15rem, calc(env(safe-area-inset-top) + 2.7rem));
+    right: 0.75rem;
+    left: 0.75rem;
+  }
+
   .story-navigation {
     right: 0.3rem;
     left: 0.3rem;
@@ -602,6 +679,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .close-story-button,
+  .delete-story-button,
   .story-direction {
     transition: none;
   }
