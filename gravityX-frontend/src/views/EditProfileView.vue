@@ -14,12 +14,13 @@ const selectedFile = ref(null);
 const previewUrl = ref(null);
 let redirectTimer = null;
 const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const form = ref({
   name: '',
   username: '',
   bio: '',
-  profile_photo_url: ''
+  profile_photo_url: '',
 });
 
 const displayAvatar = computed(() => {
@@ -77,6 +78,22 @@ const onFileChange = (event) => {
   error.value = '';
   successMessage.value = '';
 
+  if (!ACCEPTED_AVATAR_TYPES.has(selectedImage.type)) {
+    selectedFile.value = null;
+    revokePreviewUrl();
+    event.target.value = '';
+    error.value = 'Choose a JPEG, PNG, or WebP profile photo.';
+    return;
+  }
+
+  if (selectedImage.size === 0) {
+    selectedFile.value = null;
+    revokePreviewUrl();
+    event.target.value = '';
+    error.value = 'The selected profile photo is empty. Choose another file.';
+    return;
+  }
+
   if (selectedImage.size > MAX_AVATAR_SIZE_BYTES) {
     selectedFile.value = null;
     revokePreviewUrl();
@@ -87,7 +104,14 @@ const onFileChange = (event) => {
 
   revokePreviewUrl();
   selectedFile.value = selectedImage;
-  previewUrl.value = URL.createObjectURL(selectedImage);
+
+  try {
+    previewUrl.value = URL.createObjectURL(selectedImage);
+  } catch {
+    selectedFile.value = null;
+    event.target.value = '';
+    error.value = 'The selected profile photo could not be prepared for preview.';
+  }
 };
 
 const handleAvatarError = (event) => {
@@ -109,7 +133,7 @@ const handleSave = async () => {
   }
 
   try {
-    const responsePayload = await api.put('/me', formData);
+    const responsePayload = await api.post('/me', formData);
     const updatedUser = responsePayload?.data;
 
     if (!updatedUser || typeof updatedUser !== 'object') {
@@ -148,29 +172,30 @@ onBeforeUnmount(() => {
   <div class="edit-container">
     <div class="glass-panel">
       
-      <div class="edit-header">
+      <header class="edit-header">
         <router-link to="/profile" class="back-btn">
-          <i class="fa-solid fa-chevron-left"></i> Cancel
+          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Cancel
         </router-link>
         <h2>Edit Profile</h2>
-        <div style="width: 65px;"></div> 
-      </div>
+        <span class="header-spacer" aria-hidden="true"></span>
+      </header>
 
       <div class="avatar-section">
-        <div class="avatar-wrapper" @click="triggerFileInput">
-          <img class="avatar-preview" :src="displayAvatar" alt="Profile avatar" @error="handleAvatarError" />
-          <div class="avatar-overlay">
+        <button type="button" class="avatar-wrapper" aria-label="Choose a new profile photo" :disabled="loading" @click="triggerFileInput">
+          <img class="avatar-preview" :src="displayAvatar" alt="Profile avatar" @error="handleAvatarError">
+          <span class="avatar-overlay" aria-hidden="true">
             <i class="fa-solid fa-camera"></i>
-          </div>
-        </div>
-        <input 
+          </span>
+        </button>
+        <input
           type="file" 
           ref="fileInput" 
           hidden 
           @change="onFileChange" 
-          accept="image/png, image/jpeg, image/jpg" 
+          accept="image/jpeg,image/png,image/webp"
+          :disabled="loading"
         />
-        <button type="button" class="change-photo-btn" @click="triggerFileInput">
+        <button type="button" class="change-photo-btn" :disabled="loading" @click="triggerFileInput">
           Change Profile Photo
         </button>
       </div>
@@ -179,30 +204,30 @@ onBeforeUnmount(() => {
       <form @submit.prevent="handleSave" class="form-body">
         
         <transition name="fade">
-          <div class="alert-box error" v-if="error">
-            <i class="fa-solid fa-circle-exclamation"></i> {{ error }}
+          <div v-if="error" class="alert-box error" role="alert">
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> {{ error }}
           </div>
         </transition>
 
         <transition name="fade">
-          <div class="alert-box success" v-if="successMessage">
-            <i class="fa-solid fa-circle-check"></i> {{ successMessage }}
+          <div v-if="successMessage" class="alert-box success" role="status">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i> {{ successMessage }}
           </div>
         </transition>
 
         <div class="form-group">
-          <label>Name</label>
-          <input type="text" v-model="form.name" required placeholder="Your full name" class="glass-input" />
+          <label for="profile-name">Name</label>
+          <input id="profile-name" v-model="form.name" type="text" autocomplete="name" required maxlength="255" placeholder="Your full name" class="glass-input" :disabled="loading">
         </div>
         
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" v-model="form.username" required placeholder="Choose a username" class="glass-input" />
+          <label for="profile-username">Username</label>
+          <input id="profile-username" v-model="form.username" type="text" autocomplete="username" required maxlength="255" pattern="[^/]+" title="A username cannot contain a slash." placeholder="Choose a username" class="glass-input" :disabled="loading">
         </div>
         
         <div class="form-group">
-          <label>Bio</label>
-          <textarea v-model="form.bio" rows="4" placeholder="Write something about yourself..." class="glass-input"></textarea>
+          <label for="profile-bio">Bio</label>
+          <textarea id="profile-bio" v-model="form.bio" rows="4" maxlength="1000" placeholder="Write something about yourself..." class="glass-input" :disabled="loading"></textarea>
         </div>
 
         <button type="submit" class="btn-submit glow-effect" :disabled="loading">
@@ -221,7 +246,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: flex-start;
   min-height: 100vh;
-  padding: 40px 20px 100px 20px;
+  min-height: 100dvh;
+  padding: 40px 20px calc(7.5rem + env(safe-area-inset-bottom));
   color: #fff;
 }
 
@@ -232,7 +258,7 @@ onBeforeUnmount(() => {
   background: rgba(33, 25, 52, 0.7);
   border: 1px solid rgba(111, 92, 255, 0.3);
   border-radius: 24px;
-  padding: 30px;
+  padding: clamp(1.25rem, 6vw, 1.875rem);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -240,8 +266,9 @@ onBeforeUnmount(() => {
 
 /* Header */
 .edit-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.75rem;
   align-items: center;
   margin-bottom: 40px;
 }
@@ -254,11 +281,16 @@ onBeforeUnmount(() => {
 }
 
 .back-btn {
+  justify-self: start;
   color: #C9C2E8;
   font-size: 1rem;
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s;
+}
+
+.header-spacer {
+  min-width: 0;
 }
 
 .back-btn:hover {
@@ -281,12 +313,23 @@ onBeforeUnmount(() => {
   cursor: pointer;
   overflow: hidden;
   border: 3px solid #6F5CFF;
+  padding: 0;
+  background: transparent;
   box-shadow: 0 4px 15px rgba(111, 92, 255, 0.4);
   transition: transform 0.3s ease;
 }
 
 .avatar-wrapper:hover {
   transform: scale(1.05);
+}
+
+.avatar-wrapper:focus-visible {
+  outline-offset: 4px;
+}
+
+.avatar-wrapper:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .avatar-preview {
@@ -333,6 +376,11 @@ onBeforeUnmount(() => {
   color: #FFC857;
 }
 
+.change-photo-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 /* Form */
 .form-body {
   display: flex;
@@ -354,6 +402,7 @@ onBeforeUnmount(() => {
 
 /* Glass-styled Inputs */
 .glass-input {
+  width: 100%;
   background-color: rgba(20, 15, 35, 0.5);
   border: 1px solid rgba(111, 92, 255, 0.2);
   color: #fff;
@@ -369,6 +418,11 @@ onBeforeUnmount(() => {
   border-color: #6F5CFF;
   background-color: rgba(20, 15, 35, 0.8);
   box-shadow: 0 0 0 3px rgba(111, 92, 255, 0.2);
+}
+
+.glass-input:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .glass-input::placeholder {
@@ -428,5 +482,23 @@ onBeforeUnmount(() => {
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+@media (max-width: 420px) {
+  .edit-container {
+    padding: 1.25rem 1rem calc(7.5rem + env(safe-area-inset-bottom));
+  }
+
+  .edit-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .header-spacer {
+    display: none;
+  }
+
+  .edit-header h2 {
+    font-size: 1.1rem;
+  }
 }
 </style>

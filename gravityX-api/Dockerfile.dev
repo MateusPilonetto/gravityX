@@ -1,0 +1,49 @@
+FROM php:8.4-cli-alpine
+
+RUN apk add --no-cache \
+    curl \
+    freetype-dev \
+    git \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    libzip-dev \
+    oniguruma-dev \
+    postgresql-dev \
+    sqlite-dev \
+    unzip \
+    zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
+        bcmath \
+        gd \
+        mbstring \
+        opcache \
+        pdo \
+        pdo_pgsql \
+        pdo_sqlite \
+        zip
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --prefer-dist --no-scripts
+
+COPY docker/entrypoint.dev.sh /usr/local/bin/gravityx-api-dev
+COPY . .
+
+RUN chmod +x /usr/local/bin/gravityx-api-dev \
+    && mkdir -p \
+        bootstrap/cache \
+        storage/app/private \
+        storage/app/public \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/gravityx-api-dev"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

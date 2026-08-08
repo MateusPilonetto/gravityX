@@ -1,0 +1,26 @@
+.git
+.agents
+.codex
+.env
+.env.*
+
+# The API image is built from the repository root. Do not copy local secrets
+# or local runtime artifacts into that image.
+gravityX-api/.env
+gravityX-api/.env.*
+!gravityX-api/.env.example
+gravityX-api/vendor
+gravityX-api/node_modules
+gravityX-api/database/database.sqlite
+gravityX-api/public/storage
+gravityX-api/storage/framework/cache
+gravityX-api/storage/framework/sessions
+gravityX-api/storage/framework/views
+gravityX-api/storage/logs
+
+gravityX-frontend
+gravityX-frontend/.env
+gravityX-frontend/.env.*
+!gravityX-frontend/.env.example
+gravityX-frontend/node_modules
+gravityX-frontend/dist

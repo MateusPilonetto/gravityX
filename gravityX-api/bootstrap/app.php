@@ -16,7 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function (): void {
             // Media is public and must not be blocked by the web session
             // middleware when a browser loads it through an <img> element.
-            Route::middleware('api')->group(base_path('routes/media.php'));
+            // CORS is global; each route declares only the middleware it needs.
+            Route::group([], base_path('routes/media.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

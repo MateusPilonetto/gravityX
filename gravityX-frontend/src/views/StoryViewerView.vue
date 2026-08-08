@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
 
 .story-viewer {
   position: fixed;
-  z-index: 100;
+  z-index: 200;
   inset: 0;
   display: grid;
   min-height: 100dvh;
@@ -682,7 +682,7 @@ onBeforeUnmount(() => {
 
   .story-stage,
   .viewer-status {
-    width: 100vw;
+    width: 100%;
     height: 100dvh;
     max-height: none;
     aspect-ratio: auto;

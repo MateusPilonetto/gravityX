@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import PostCard from '../components/PostCard.vue';
 import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api.js';
 import { fetchFeed } from '../services/posts.js';
@@ -17,7 +17,10 @@ const ACCEPTED_STORY_MEDIA_TYPES = new Set([
 const posts = ref([]);
 const storyGroups = ref([]);
 const loading = ref(true);
+const loadingMore = ref(false);
 const errorMessage = ref('');
+const loadMoreError = ref('');
+const pagination = ref(null);
 const loadingPlaceholders = [1, 2, 3];
 const storyGalleryInput = ref(null);
 const storyCameraInput = ref(null);
@@ -25,6 +28,8 @@ const uploadingStory = ref(false);
 const storyUploadStatus = ref('');
 const storyUploadError = ref('');
 const isStorySourceChooserOpen = ref(false);
+const storySourceDialog = ref(null);
+let storySourceTrigger = null;
 
 const displayName = computed(() => {
   const name = userStore.currentUser?.name?.trim();
@@ -46,15 +51,23 @@ const feedSummary = computed(() => {
 
   return `${count} ${count === 1 ? 'post' : 'posts'} waiting for you.`;
 });
+const hasMorePosts = computed(() => Boolean(pagination.value?.has_more_pages));
+const isFeedBusy = computed(() => loading.value || loadingMore.value);
 
 async function loadPosts() {
+  if (loadingMore.value) {
+    return;
+  }
+
   loading.value = true;
   errorMessage.value = '';
+  loadMoreError.value = '';
 
   try {
     const feed = await fetchFeed();
     posts.value = feed.posts;
     storyGroups.value = feed.stories;
+    pagination.value = feed.pagination;
   } catch (errorResponse) {
     if (errorResponse.status === 401) {
       return;
@@ -64,6 +77,38 @@ async function loadPosts() {
     errorMessage.value = errorResponse.firstMessage?.() || errorResponse.message || 'Could not load the feed.';
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMorePosts() {
+  if (!hasMorePosts.value || isFeedBusy.value) {
+    return;
+  }
+
+  loadingMore.value = true;
+  loadMoreError.value = '';
+
+  try {
+    const nextPage = (Number(pagination.value?.current_page) || 1) + 1;
+    const feed = await fetchFeed({ page: nextPage });
+    const displayedPostIds = new Set(posts.value.map((post) => String(post.id)));
+
+    posts.value = [
+      ...posts.value,
+      ...feed.posts.filter((post) => !displayedPostIds.has(String(post.id))),
+    ];
+    pagination.value = feed.pagination;
+  } catch (errorResponse) {
+    if (errorResponse.status === 401) {
+      return;
+    }
+
+    console.error('Failed to load more posts:', errorResponse);
+    loadMoreError.value = errorResponse.firstMessage?.()
+      || errorResponse.message
+      || 'Could not load more posts.';
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -116,15 +161,52 @@ function openStoryMediaPicker() {
   storyUploadError.value = '';
 
   if (window.matchMedia('(max-width: 600px)').matches) {
+    storySourceTrigger = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     isStorySourceChooserOpen.value = true;
+    setApplicationInert(true);
+    void nextTick(() => storySourceDialog.value?.querySelector('button')?.focus());
     return;
   }
 
   storyGalleryInput.value?.click();
 }
 
-function closeStorySourceChooser() {
+function setApplicationInert(isInert) {
+  const applicationRoot = document.getElementById('app');
+
+  if (!applicationRoot) {
+    return;
+  }
+
+  if (isInert) {
+    applicationRoot.setAttribute('inert', '');
+    applicationRoot.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  applicationRoot.removeAttribute('inert');
+  applicationRoot.removeAttribute('aria-hidden');
+}
+
+function closeStorySourceChooser({ restoreFocus = true } = {}) {
+  if (!isStorySourceChooserOpen.value) {
+    return;
+  }
+
   isStorySourceChooserOpen.value = false;
+  setApplicationInert(false);
+
+  if (restoreFocus) {
+    const trigger = storySourceTrigger;
+    storySourceTrigger = null;
+    void nextTick(() => {
+      if (trigger?.isConnected) {
+        trigger.focus();
+      }
+    });
+  }
 }
 
 function chooseStoryMediaSource(source) {
@@ -132,10 +214,42 @@ function chooseStoryMediaSource(source) {
     return;
   }
 
-  closeStorySourceChooser();
+  closeStorySourceChooser({ restoreFocus: false });
 
   const input = source === 'camera' ? storyCameraInput.value : storyGalleryInput.value;
   input?.click();
+}
+
+function handleStorySourceDialogKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeStorySourceChooser();
+    return;
+  }
+
+  if (event.key !== 'Tab' || !storySourceDialog.value) {
+    return;
+  }
+
+  const focusableElements = Array.from(storySourceDialog.value.querySelectorAll(
+    'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+  ));
+
+  if (focusableElements.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
 }
 
 async function handleStoryMediaSelection(event) {
@@ -188,6 +302,10 @@ async function handleStoryMediaSelection(event) {
 
 onMounted(() => {
   void loadPosts();
+});
+
+onBeforeUnmount(() => {
+  setApplicationInert(false);
 });
 </script>
 
@@ -268,10 +386,12 @@ onMounted(() => {
         >
           <section
             class="story-source-dialog"
+            ref="storySourceDialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="story-source-dialog-title"
-            @keydown.esc="closeStorySourceChooser"
+            tabindex="-1"
+            @keydown="handleStorySourceDialogKeydown"
           >
             <div class="story-source-dialog-heading">
               <div>
@@ -356,11 +476,11 @@ onMounted(() => {
         <button
           type="button"
           class="refresh-button"
-          :disabled="loading"
+          :disabled="isFeedBusy"
           aria-label="Refresh feed"
           @click="loadPosts"
         >
-          <i class="fa-solid fa-rotate-right" :class="{ spinning: loading }" aria-hidden="true"></i>
+          <i class="fa-solid fa-rotate-right" :class="{ spinning: isFeedBusy }" aria-hidden="true"></i>
           <span>Refresh</span>
         </button>
       </div>
@@ -398,6 +518,19 @@ onMounted(() => {
           :post="post"
           @updated="updatePost"
         />
+        <div v-if="hasMorePosts || loadMoreError" class="load-more-area">
+          <p v-if="loadMoreError" class="load-more-error" role="alert">{{ loadMoreError }}</p>
+          <button
+            v-if="hasMorePosts"
+            type="button"
+            class="load-more-button"
+            :disabled="loadingMore"
+            @click="loadMorePosts"
+          >
+            <i :class="loadingMore ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrow-down'" aria-hidden="true"></i>
+            {{ loadingMore ? 'Loading…' : 'Load more posts' }}
+          </button>
+        </div>
       </div>
 
       <div v-else class="status-surface empty-surface">
@@ -584,6 +717,10 @@ onMounted(() => {
 }
 
 .story-source-dialog-backdrop {
+  --purple: #8b7cff;
+  --purple-soft: #c9c2e8;
+  --gold: #ffc857;
+  --muted: #b8afcb;
   position: fixed;
   z-index: 100;
   inset: 0;
@@ -853,6 +990,45 @@ onMounted(() => {
   border-radius: 13px;
   font-weight: 700;
   transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.load-more-area {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+.load-more-button {
+  display: inline-flex;
+  min-height: 2.8rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 200, 87, 0.7);
+  border-radius: 12px;
+  padding: 0.55rem 0.9rem;
+  background: rgba(255, 200, 87, 0.1);
+  color: var(--gold);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.load-more-button:hover:not(:disabled) {
+  background: rgba(255, 200, 87, 0.18);
+}
+
+.load-more-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.load-more-error {
+  margin: 0;
+  color: #ffabab;
+  font-size: 0.86rem;
+  text-align: center;
 }
 
 .hero-create-button {
@@ -1201,6 +1377,10 @@ onMounted(() => {
 
   .hero-create-button,
   .secondary-button {
+    width: 100%;
+  }
+
+  .load-more-button {
     width: 100%;
   }
 

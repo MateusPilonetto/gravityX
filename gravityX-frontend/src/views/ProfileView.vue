@@ -4,12 +4,10 @@ import { useRouter } from 'vue-router';
 import PostCard from '../components/PostCard.vue';
 import {
   api,
-  clearToken,
   getFallbackAvatarUrl,
   getProfileAvatarUrl,
 } from '../services/api.js';
 import { fetchPostsByUsername } from '../services/posts.js';
-import { userStore } from '../store.js';
 
 const router = useRouter();
 
@@ -18,10 +16,14 @@ const loading = ref(true);
 const errorMessage = ref('');
 const posts = ref([]);
 const postsLoading = ref(false);
+const loadingMorePosts = ref(false);
 const postsError = ref('');
+const loadMorePostsError = ref('');
+const postsPagination = ref(null);
 let activePostsRequestId = 0;
 
 const avatarUrl = computed(() => getProfileAvatarUrl(profileUser.value));
+const hasMorePosts = computed(() => Boolean(postsPagination.value?.has_more_pages));
 
 const loadProfile = async () => {
   loading.value = true;
@@ -48,34 +50,95 @@ const loadProfile = async () => {
   }
 };
 
-const loadProfilePosts = async (username = profileUser.value?.username) => {
+const loadProfilePosts = async (username = profileUser.value?.username, { append = false } = {}) => {
   const requestId = ++activePostsRequestId;
-  postsLoading.value = true;
-  postsError.value = '';
-  posts.value = [];
+  const page = append ? (Number(postsPagination.value?.current_page) || 1) + 1 : 1;
+
+  if (append) {
+    loadingMorePosts.value = true;
+    loadMorePostsError.value = '';
+  } else {
+    postsLoading.value = true;
+    postsError.value = '';
+    loadMorePostsError.value = '';
+    posts.value = [];
+    postsPagination.value = null;
+  }
 
   try {
-    posts.value = await fetchPostsByUsername(username);
+    const response = await fetchPostsByUsername(username, { page });
+
+    if (requestId !== activePostsRequestId) {
+      return;
+    }
+
+    if (append) {
+      const displayedPostIds = new Set(posts.value.map((post) => String(post.id)));
+      posts.value = [
+        ...posts.value,
+        ...response.posts.filter((post) => !displayedPostIds.has(String(post.id))),
+      ];
+    } else {
+      posts.value = response.posts;
+    }
+
+    postsPagination.value = response.pagination;
   } catch (errorResponse) {
     if (requestId !== activePostsRequestId || errorResponse.status === 401) {
       return;
     }
 
     console.error('Failed to load profile posts:', errorResponse);
-    postsError.value = errorResponse.firstMessage?.()
+    const message = errorResponse.firstMessage?.()
       || errorResponse.message
       || 'Could not load posts.';
+
+    if (append) {
+      loadMorePostsError.value = message;
+    } else {
+      postsError.value = message;
+    }
   } finally {
     if (requestId === activePostsRequestId) {
-      postsLoading.value = false;
+      if (append) {
+        loadingMorePosts.value = false;
+      } else {
+        postsLoading.value = false;
+      }
     }
   }
+};
+
+const loadMoreProfilePosts = () => {
+  if (!hasMorePosts.value || postsLoading.value || loadingMorePosts.value) {
+    return;
+  }
+
+  void loadProfilePosts(profileUser.value?.username, { append: true });
 };
 
 const updatePost = (updatedPost) => {
   posts.value = posts.value.map((post) => (
     post.id === updatedPost.id ? { ...post, ...updatedPost } : post
   ));
+};
+
+const updatePostsPaginationAfterDelete = () => {
+  if (!postsPagination.value) {
+    return;
+  }
+
+  const total = Math.max(0, (Number(postsPagination.value.total) || 0) - 1);
+  const perPage = Math.max(1, Number(postsPagination.value.per_page) || 20);
+  const lastPage = Math.max(1, Math.ceil(total / perPage));
+  const currentPage = Math.max(1, Number(postsPagination.value.current_page) || 1);
+
+  postsPagination.value = {
+    ...postsPagination.value,
+    total,
+    last_page: lastPage,
+    has_more_pages: currentPage < lastPage,
+  };
 };
 
 const removePost = (deletedPostId) => {
@@ -90,6 +153,7 @@ const removePost = (deletedPostId) => {
     && Number.isFinite(Number(profileUser.value.posts_count))
   ) {
     profileUser.value.posts_count = Math.max(0, Number(profileUser.value.posts_count) - 1);
+    updatePostsPaginationAfterDelete();
   }
 };
 
@@ -101,11 +165,6 @@ const handleAvatarError = (event) => {
   event.currentTarget.src = getFallbackAvatarUrl(profileUser.value, 256);
 };
 
-const handleLogout = () => {
-  clearToken();
-  userStore.clearUser();
-  router.replace('/login');
-};
 </script>
 
 <template>
@@ -118,7 +177,7 @@ const handleLogout = () => {
     <div v-else-if="errorMessage" class="center-message error-box">
       <i class="fa-solid fa-triangle-exclamation fa-2xl" style="color: #ff5d5d;"></i>
       <p>{{ errorMessage }}</p>
-      <button @click="router.push('/')" class="btn-back">Go to Feed</button>
+      <button type="button" @click="router.push('/')" class="btn-back">Go to Feed</button>
     </div>
     
     <div v-else-if="profileUser" class="gravityx-layout">
@@ -175,6 +234,18 @@ const handleLogout = () => {
             @updated="updatePost"
             @deleted="removePost"
           />
+          <div v-if="hasMorePosts || loadMorePostsError" class="load-more-area">
+            <p v-if="loadMorePostsError" class="load-more-error" role="alert">{{ loadMorePostsError }}</p>
+            <button
+              v-if="hasMorePosts"
+              type="button"
+              class="posts-retry-button"
+              :disabled="loadingMorePosts"
+              @click="loadMoreProfilePosts"
+            >
+              {{ loadingMorePosts ? 'Loading…' : 'Load more posts' }}
+            </button>
+          </div>
         </div>
 
         <div v-else class="empty-posts">
@@ -192,7 +263,7 @@ const handleLogout = () => {
 .profile-container { 
   max-width: 935px; 
   margin: 0 auto; 
-  padding: 30px 20px 80px 20px; 
+  padding: 30px 20px calc(7.5rem + env(safe-area-inset-bottom));
   color: #fff; 
 }
 .center-message { 
@@ -200,7 +271,8 @@ const handleLogout = () => {
   flex-direction: column; 
   justify-content: center; 
   align-items: center; 
-  height: 60vh; 
+  min-height: 60vh;
+  min-height: 60dvh;
   text-align: center; 
 }
 .error-box { 
@@ -208,7 +280,7 @@ const handleLogout = () => {
   border: 1px solid rgba(255, 93, 93, 0.3); 
   border-radius: 12px; 
   padding: 30px; 
-  max-width: 400px; 
+  width: min(100%, 400px);
   margin: 0 auto; 
 }
 .btn-back { 
@@ -221,14 +293,15 @@ const handleLogout = () => {
   margin-top: 15px; 
 }
 .profile-header { 
-  display: flex; 
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: clamp(1rem, 4vw, 1.875rem);
   margin-bottom: 44px; 
 }
 .profile-avatar-container { 
-  flex: 1; 
   display: flex; 
   justify-content: center; 
-  margin-right: 30px; 
 }
 .profile-avatar { 
   width: 150px; 
@@ -238,7 +311,7 @@ const handleLogout = () => {
   border: 2px solid rgba(111, 92, 255, 0.5); 
 }
 .profile-info {
-  flex: 2;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -246,6 +319,7 @@ const handleLogout = () => {
 .info-top {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 20px;
   gap: 15px;
 }
@@ -255,6 +329,7 @@ const handleLogout = () => {
   font-weight: 500;
   margin: 0;
   color: #C9C2E8;
+  overflow-wrap: anywhere;
 }
 
 .btn-edit {
@@ -279,10 +354,11 @@ const handleLogout = () => {
 
 .info-stats {
   display: flex;
+  flex-wrap: wrap;
   list-style: none;
   padding: 0;
   margin: 0 0 20px 0;
-  gap: 40px;
+  gap: 0.6rem clamp(1rem, 5vw, 2.5rem);
 }
 
 .stat-count {
@@ -303,6 +379,7 @@ const handleLogout = () => {
 
 .bio-text {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: #C9C2E8;
 }
 
@@ -373,15 +450,58 @@ const handleLogout = () => {
   font-weight: bold;
 }
 
-@media (max-width: 600px) {
- .profile-header {
-  display: flex;
-  flex-direction: column;
- } 
+.load-more-area {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
 
- .info-top {
-  display: flex;
-  justify-content: space-between;
- }
+.load-more-error {
+  margin: 0;
+  color: #ff9e9e;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .profile-container {
+    padding: 1.25rem 1rem calc(7.5rem + env(safe-area-inset-bottom));
+  }
+
+  .profile-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .profile-avatar {
+    width: 7rem;
+    height: 7rem;
+  }
+
+  .info-top {
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .info-stats {
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .info-bio {
+    text-align: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .info-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .btn-edit {
+    text-align: center;
+  }
 }
 </style>

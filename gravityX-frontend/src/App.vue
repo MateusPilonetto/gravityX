@@ -80,7 +80,18 @@ watch(() => route.path, () => {
 }, { immediate: true });
 
 const handleLogout = () => {
+  const invalidateSession = api.post('/logout');
+
+  // Do not leave someone trapped in the authenticated UI when their
+  // connection is slow or unavailable. `api.post` captures the token before
+  // this clears it, so the server can still revoke the current session.
   redirectToLogin();
+
+  void invalidateSession.catch((errorResponse) => {
+    if (errorResponse.status !== 401) {
+      console.error('Failed to invalidate the current session:', errorResponse);
+    }
+  });
 };
 </script>
 
@@ -109,20 +120,20 @@ const handleLogout = () => {
     <PwaStatus />
 
      <div class="bottom-nav-wrapper" v-if="showApplicationChrome">
-        <nav class="bottom-nav">       
-          <router-link to="/" class="nav-link">
+        <nav class="bottom-nav" aria-label="Primary navigation">
+          <router-link to="/" class="nav-link" aria-label="Home">
             <i class="fa-solid fa-house nav-icon"></i>
           </router-link>
 
-          <router-link to="/search" class="nav-link">
+          <router-link to="/search" class="nav-link" aria-label="Search users">
             <i class="fa-solid fa-magnifying-glass nav-icon"></i>
           </router-link>        
           
-          <router-link to="/posts/create" class="nav-link">
+          <router-link to="/posts/create" class="nav-link" aria-label="Create post">
             <i class="fa-solid fa-square-plus nav-icon"></i>
           </router-link>              
           
-          <router-link to="/profile" class="nav-link">
+          <router-link to="/profile" class="nav-link" aria-label="Your profile">
             <img
               class="nav-profile-pic"
               loading="lazy"
@@ -142,7 +153,7 @@ header {
   justify-content: space-between;
   align-items: center;
 
-  width: 99vw;
+  width: 100%;
   
   padding: 1rem 1rem;
   box-sizing: border-box;
@@ -184,6 +195,10 @@ header {
 
 .logout-button {
   display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
   color: #ff5d5d;
   background: transparent;
   border: 0;
@@ -193,7 +208,7 @@ header {
 
 .bottom-nav-wrapper {
   position: fixed;
-  bottom: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   z-index: 50;
@@ -234,6 +249,10 @@ header {
 
 .nav-link {
   display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-profile-pic {
@@ -248,5 +267,39 @@ header {
 
 .nav-profile-pic:hover {
   transform: scale(1.1);
+}
+
+@media (max-width: 420px) {
+  header {
+    padding: 0.75rem;
+  }
+
+  .logo {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .logo-items {
+    gap: 0.65rem;
+  }
+
+  .logo-title {
+    font-size: 1.45rem;
+  }
+
+  .buttons {
+    width: 3.25rem;
+    height: 3.25rem;
+    margin: 0;
+  }
+
+  .bottom-nav {
+    gap: clamp(0.35rem, 3vw, 0.85rem);
+    padding: 0.5rem clamp(0.65rem, 4vw, 1rem);
+  }
+
+  .nav-icon {
+    font-size: 2rem;
+  }
 }
 </style>

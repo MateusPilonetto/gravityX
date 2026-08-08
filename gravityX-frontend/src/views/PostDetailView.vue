@@ -3,21 +3,25 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PostCard from '../components/PostCard.vue';
 import { getFallbackAvatarUrl, getProfileAvatarUrl } from '../services/api.js';
-import { createPostComment, fetchPost } from '../services/posts.js';
+import { createPostComment, fetchPost, fetchPostComments } from '../services/posts.js';
 
 const route = useRoute();
 const router = useRouter();
 const post = ref(null);
 const comments = ref([]);
+const commentsPagination = ref(null);
 const loading = ref(true);
 const errorMessage = ref('');
 const commentBody = ref('');
 const commentError = ref('');
 const submittingComment = ref(false);
+const loadingMoreComments = ref(false);
+const commentsLoadError = ref('');
 let activeRequestId = 0;
 
 const postId = computed(() => route.params.postId);
 const commentsCount = computed(() => Number(post.value?.comments_count) || comments.value.length);
+const hasMoreComments = computed(() => Boolean(commentsPagination.value?.has_more_pages));
 
 function formatDate(dateValue) {
   if (!dateValue) {
@@ -52,6 +56,23 @@ function handleCommentAvatarError(event, user) {
   event.currentTarget.src = getFallbackAvatarUrl(user, 72);
 }
 
+function sortCommentsChronologically(commentList) {
+  return [...commentList].sort((firstComment, secondComment) => {
+    const firstTimestamp = Date.parse(firstComment?.created_at || '');
+    const secondTimestamp = Date.parse(secondComment?.created_at || '');
+
+    if (
+      Number.isFinite(firstTimestamp)
+      && Number.isFinite(secondTimestamp)
+      && firstTimestamp !== secondTimestamp
+    ) {
+      return firstTimestamp - secondTimestamp;
+    }
+
+    return (Number(firstComment?.id) || 0) - (Number(secondComment?.id) || 0);
+  });
+}
+
 async function loadPost() {
   const requestId = ++activeRequestId;
   const requestedPostId = postId.value;
@@ -60,6 +81,9 @@ async function loadPost() {
   commentError.value = '';
   post.value = null;
   comments.value = [];
+  commentsPagination.value = null;
+  commentsLoadError.value = '';
+  loadingMoreComments.value = false;
 
   if (typeof requestedPostId !== 'string' || !/^\d+$/.test(requestedPostId)) {
     errorMessage.value = 'Post not found.';
@@ -79,7 +103,31 @@ async function loadPost() {
     }
 
     post.value = response.post;
-    comments.value = response.comments;
+
+    if (Array.isArray(response.comments) && response.commentsPagination) {
+      comments.value = sortCommentsChronologically(response.comments);
+      commentsPagination.value = response.commentsPagination;
+    } else {
+      try {
+        const commentsResponse = await fetchPostComments(requestedPostId);
+
+        if (requestId !== activeRequestId) {
+          return;
+        }
+
+        comments.value = sortCommentsChronologically(commentsResponse.comments);
+        commentsPagination.value = commentsResponse.pagination;
+      } catch (commentsError) {
+        if (requestId !== activeRequestId || commentsError.status === 401) {
+          return;
+        }
+
+        console.error('Failed to load comments:', commentsError);
+        commentsLoadError.value = commentsError.firstMessage?.()
+          || commentsError.message
+          || 'Could not load comments.';
+      }
+    }
   } catch (errorResponse) {
     if (requestId !== activeRequestId || errorResponse.status === 401) {
       return;
@@ -92,6 +140,51 @@ async function loadPost() {
   } finally {
     if (requestId === activeRequestId) {
       loading.value = false;
+    }
+  }
+}
+
+async function loadMoreComments() {
+  if (!post.value || !hasMoreComments.value || loadingMoreComments.value) {
+    return;
+  }
+
+  const requestId = activeRequestId;
+  const requestedPostId = post.value.id;
+  loadingMoreComments.value = true;
+  commentsLoadError.value = '';
+
+  try {
+    const page = (Number(commentsPagination.value?.current_page) || 1) + 1;
+    const commentsResponse = await fetchPostComments(requestedPostId, { page });
+
+    if (requestId !== activeRequestId || String(post.value?.id) !== String(requestedPostId)) {
+      return;
+    }
+
+    const displayedCommentIds = new Set(comments.value.map((comment) => String(comment.id)));
+
+    comments.value = sortCommentsChronologically([
+      ...comments.value,
+      ...commentsResponse.comments.filter((comment) => !displayedCommentIds.has(String(comment.id))),
+    ]);
+    commentsPagination.value = commentsResponse.pagination;
+  } catch (errorResponse) {
+    if (requestId !== activeRequestId) {
+      return;
+    }
+
+    if (errorResponse.status === 401) {
+      return;
+    }
+
+    console.error('Failed to load more comments:', errorResponse);
+    commentsLoadError.value = errorResponse.firstMessage?.()
+      || errorResponse.message
+      || 'Could not load more comments.';
+  } finally {
+    if (requestId === activeRequestId) {
+      loadingMoreComments.value = false;
     }
   }
 }
@@ -119,11 +212,14 @@ async function handleCommentSubmit() {
 
   try {
     const { comment, commentsCount: updatedCommentsCount } = await createPostComment(post.value.id, body);
-    comments.value = [...comments.value, comment];
+    comments.value = sortCommentsChronologically([...comments.value, comment]);
     post.value = {
       ...post.value,
       comments_count: updatedCommentsCount ?? comments.value.length,
     };
+    if (commentsPagination.value && updatedCommentsCount !== null) {
+      commentsPagination.value.total = updatedCommentsCount;
+    }
     commentBody.value = '';
   } catch (errorResponse) {
     if (errorResponse.status === 401) {
@@ -216,6 +312,23 @@ watch(postId, () => {
               <p>{{ comment.body }}</p>
             </div>
           </article>
+          <div v-if="hasMoreComments || commentsLoadError" class="comments-load-more">
+            <p v-if="commentsLoadError" class="comment-error" role="alert">{{ commentsLoadError }}</p>
+            <button
+              v-if="hasMoreComments"
+              type="button"
+              class="comment-submit-button"
+              :disabled="loadingMoreComments"
+              @click="loadMoreComments"
+            >
+              {{ loadingMoreComments ? 'Loading…' : 'Load more comments' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="commentsLoadError" class="empty-comments" role="alert">
+          <p>{{ commentsLoadError }}</p>
+          <button type="button" class="comment-submit-button" @click="loadPost">Try again</button>
         </div>
 
         <div v-else class="empty-comments">
@@ -370,6 +483,13 @@ watch(postId, () => {
   margin-top: 0.9rem;
 }
 
+.comments-load-more {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  margin-top: 0.15rem;
+}
+
 .comment-card {
   display: flex;
   gap: 0.75rem;
@@ -402,12 +522,14 @@ watch(postId, () => {
 .comment-author {
   color: #fff;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .comment-username,
 .comment-meta time {
   color: #b7afcb;
   font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .comment-content p {
@@ -433,6 +555,15 @@ watch(postId, () => {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .comment-form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comment-submit-button {
+    width: 100%;
   }
 }
 </style>
