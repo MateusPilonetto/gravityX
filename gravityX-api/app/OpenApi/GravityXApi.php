@@ -199,7 +199,32 @@ final class GravityXApi
     #[OA\Put(
         path: '/me',
         operationId: 'updateCurrentProfile',
-        summary: 'Update the current profile',
+        summary: 'Update the current profile without an avatar',
+        security: [['sanctum' => []]],
+        tags: ['Profiles'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'username'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', maxLength: 255),
+                    new OA\Property(property: 'username', type: 'string', maxLength: 255),
+                    new OA\Property(property: 'bio', type: 'string', nullable: true, maxLength: 1000),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Profile updated.'),
+            new OA\Response(response: 401, description: 'Missing or invalid token.'),
+            new OA\Response(response: 422, description: 'Validation failed.', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+        ]
+    )]
+    public function updateCurrentProfile(): void {}
+
+    #[OA\Post(
+        path: '/me',
+        operationId: 'updateCurrentProfileWithAvatar',
+        summary: 'Update the current profile, optionally with an avatar',
         security: [['sanctum' => []]],
         tags: ['Profiles'],
         requestBody: new OA\RequestBody(
@@ -223,7 +248,7 @@ final class GravityXApi
             new OA\Response(response: 422, description: 'Validation failed.', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
         ]
     )]
-    public function updateCurrentProfile(): void {}
+    public function updateCurrentProfileWithAvatar(): void {}
 
     #[OA\Get(
         path: '/search',

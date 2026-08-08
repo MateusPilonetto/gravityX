@@ -133,7 +133,7 @@ const handleSave = async () => {
   }
 
   try {
-    const responsePayload = await api.put('/me', formData);
+    const responsePayload = await api.post('/me', formData);
     const updatedUser = responsePayload?.data;
 
     if (!updatedUser || typeof updatedUser !== 'object') {
