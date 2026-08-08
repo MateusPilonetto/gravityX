@@ -1,0 +1,1278 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "GravityX API",
+        "description": "REST API used by the GravityX web application. Protected endpoints require a Laravel Sanctum bearer token.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "Current GravityX API host"
+        }
+    ],
+    "paths": {
+        "/register": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Register a user",
+                "operationId": "register",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "username",
+                                    "email",
+                                    "password",
+                                    "password_confirmation"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "description": "Any non-empty name except a slash.",
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "format": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User created and token issued."
+                    },
+                    "422": {
+                        "description": "Validation failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Log in and create an API token",
+                "operationId": "login",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authenticated user and bearer token."
+                    },
+                    "422": {
+                        "description": "Invalid credentials or validation failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts."
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Revoke the current token",
+                "operationId": "logout",
+                "responses": {
+                    "200": {
+                        "description": "Logged out.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiMessage"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me": {
+            "get": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Get the current profile",
+                "operationId": "getCurrentProfile",
+                "responses": {
+                    "200": {
+                        "description": "Current profile."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Update the current profile without an avatar",
+                "operationId": "updateCurrentProfile",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "username"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "bio": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 1000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Profile updated."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "422": {
+                        "description": "Validation failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Update the current profile, optionally with an avatar",
+                "operationId": "updateCurrentProfileWithAvatar",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "username"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "bio": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 1000
+                                    },
+                                    "avatar": {
+                                        "description": "JPEG, PNG, or WebP up to 5 MB.",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Profile updated."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "422": {
+                        "description": "Validation failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/search": {
+            "get": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Search profiles by name or username",
+                "operationId": "searchProfiles",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Search term.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "At most ten matching profiles.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/User"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/suggestions": {
+            "get": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Get follow suggestions",
+                "operationId": "getProfileSuggestions",
+                "responses": {
+                    "200": {
+                        "description": "Suggested profiles."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/users/{username}": {
+            "get": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Get a profile by username",
+                "operationId": "getProfileByUsername",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Profile and follow status."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Profile not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/users/{username}/follow": {
+            "post": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Follow a profile",
+                "operationId": "followUser",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Follow state updated."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Profile not found."
+                    },
+                    "422": {
+                        "description": "Cannot follow yourself."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Profiles"
+                ],
+                "summary": "Unfollow a profile",
+                "operationId": "unfollowUser",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Follow state updated."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Profile not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/posts": {
+            "get": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get the personalized feed and active stories",
+                "operationId": "getFeed",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "From 1 to 50; defaults to 20.",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Feed page, pagination metadata, and stories."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Create a post",
+                "operationId": "createPost",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "caption": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 255
+                                    },
+                                    "body": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 5000
+                                    },
+                                    "image": {
+                                        "description": "JPEG, PNG, or WebP up to 5 MB.",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Post created."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "422": {
+                        "description": "Provide caption, body, or image; validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/posts/{post}": {
+            "get": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get a post and its first page of comments",
+                "operationId": "getPost",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Post and comments page."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Delete one of the current user posts",
+                "operationId": "deletePost",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Post deleted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiMessage"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "403": {
+                        "description": "Post belongs to another user."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/posts/{post}/likes": {
+            "post": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Like a post",
+                "operationId": "likePost",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated post with like state."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Remove a like from a post",
+                "operationId": "unlikePost",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated post with like state."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/posts/{post}/comments": {
+            "get": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get a page of post comments",
+                "operationId": "getPostComments",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comments page."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Create a comment",
+                "operationId": "createPostComment",
+                "parameters": [
+                    {
+                        "name": "post",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "body"
+                                ],
+                                "properties": {
+                                    "body": {
+                                        "type": "string",
+                                        "maxLength": 3000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Comment created."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Post not found."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/users/{username}/posts": {
+            "get": {
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get a page of posts by username",
+                "operationId": "getUserPosts",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Posts page."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "404": {
+                        "description": "Profile not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/stories": {
+            "post": {
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "Create a story that expires after 24 hours",
+                "operationId": "createStory",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "media"
+                                ],
+                                "properties": {
+                                    "media": {
+                                        "description": "JPEG, PNG, WebP, or MP4 up to 10 MB.",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Story created."
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/stories/{story}": {
+            "delete": {
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "Delete one of the current user stories",
+                "operationId": "deleteStory",
+                "parameters": [
+                    {
+                        "name": "story",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Story deleted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiMessage"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid token."
+                    },
+                    "403": {
+                        "description": "Story belongs to another user."
+                    },
+                    "404": {
+                        "description": "Story not found."
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "User": {
+                "required": [
+                    "id",
+                    "name",
+                    "username",
+                    "bio",
+                    "posts_count",
+                    "followers_count",
+                    "following_count"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Ada Lovelace"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "ada"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "ada@example.test",
+                        "nullable": true
+                    },
+                    "bio": {
+                        "type": "string",
+                        "example": "Computer programmer.",
+                        "nullable": true
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "example": "/media/avatars/1",
+                        "nullable": true
+                    },
+                    "posts_count": {
+                        "type": "integer",
+                        "example": 12
+                    },
+                    "followers_count": {
+                        "type": "integer",
+                        "example": 48
+                    },
+                    "following_count": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "mutual_connections_count": {
+                        "type": "integer",
+                        "example": 3,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Post": {
+                "required": [
+                    "id",
+                    "likes_count",
+                    "comments_count",
+                    "is_liked",
+                    "can_delete"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "caption": {
+                        "type": "string",
+                        "example": "Hello, GravityX!",
+                        "nullable": true
+                    },
+                    "body": {
+                        "type": "string",
+                        "example": "A longer post body.",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "example": "/media/posts/1",
+                        "nullable": true
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/User"
+                    },
+                    "likes_count": {
+                        "type": "integer",
+                        "example": 7
+                    },
+                    "comments_count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "is_liked": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "can_delete": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "comments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Comment"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Comment": {
+                "required": [
+                    "id",
+                    "post_id",
+                    "body"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "post_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "body": {
+                        "type": "string",
+                        "example": "Nice post!"
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/User"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Story": {
+                "required": [
+                    "id",
+                    "user_id",
+                    "media_url",
+                    "media_type",
+                    "expires_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "media_url": {
+                        "type": "string",
+                        "example": "/media/stories/1?expires=...&signature=..."
+                    },
+                    "media_type": {
+                        "type": "string",
+                        "enum": [
+                            "image",
+                            "video"
+                        ]
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Pagination": {
+                "required": [
+                    "current_page",
+                    "last_page",
+                    "per_page",
+                    "total",
+                    "has_more_pages"
+                ],
+                "properties": {
+                    "current_page": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "last_page": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "per_page": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "total": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "has_more_pages": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "ApiMessage": {
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "required": [
+                    "message",
+                    "errors"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "The given data was invalid."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "sanctum": {
+                "type": "http",
+                "description": "Paste the token returned by the login or register endpoint.",
+                "bearerFormat": "API token",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Authentication",
+            "description": "Registration and session token management."
+        },
+        {
+            "name": "Profiles",
+            "description": "Current user profiles, discovery, and follows."
+        },
+        {
+            "name": "Posts",
+            "description": "Feed, posts, likes, and comments."
+        },
+        {
+            "name": "Stories",
+            "description": "Stories that expire after 24 hours."
+        }
+    ]
+}

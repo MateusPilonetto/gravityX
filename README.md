@@ -7,6 +7,58 @@ GravityX é uma aplicação social full-stack, com frontend em Vue e uma API RES
 - `gravityX-frontend/`: aplicação Vue 3 + Vite.
 - `gravityX-api/`: API Laravel e migrations do banco.
 
+## Development environment (Docker)
+
+Prerequisite: Docker Engine with the Docker Compose plugin.
+
+From the repository root, start the development stack with:
+
+```bash
+docker compose -f compose.dev.yaml up --build
+```
+
+This starts the API with the source code mounted for development and the Vite dev server with hot reload. The default URLs are:
+
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8001`
+- Swagger UI: `http://localhost:8001/api/documentation`
+
+Run it in the background by adding `-d`:
+
+```bash
+docker compose -f compose.dev.yaml up -d --build
+```
+
+Useful development commands:
+
+```bash
+docker compose -f compose.dev.yaml ps
+docker compose -f compose.dev.yaml logs -f
+docker compose -f compose.dev.yaml down
+```
+
+The development stack keeps its database, dependencies, and application state in Docker volumes. To remove that local development state and start over, run the following destructive command:
+
+```bash
+docker compose -f compose.dev.yaml down -v
+```
+
+### Swagger UI
+
+Open `http://localhost:8001/api/documentation` after the development API is running. The OpenAPI document is generated automatically in the development container.
+
+To regenerate it manually after changing the API documentation attributes, run:
+
+```bash
+docker compose -f compose.dev.yaml exec api php artisan l5-swagger:generate
+```
+
+To call protected endpoints from Swagger UI:
+
+1. Use `POST /api/login` (or `POST /api/register`) and execute the request.
+2. Copy the `token` value from the response.
+3. Click **Authorize** in Swagger UI and paste the token. The UI adds the `Bearer` prefix automatically.
+
 ## Iniciar com Docker (recomendado)
 
 Pré-requisito: Docker com o plugin Docker Compose instalado.
