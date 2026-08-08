@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Route;
 
 $usernamePattern = '[^/]+';
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
-Route::middleware('auth:sanctum')->group(function () use ($usernamePattern) {
+Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () use ($usernamePattern) {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [ProfileController::class, 'show']);
     Route::put('/me', [ProfileController::class, 'update']);

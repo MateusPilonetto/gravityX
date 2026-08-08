@@ -358,6 +358,7 @@ async function handleDelete() {
   margin: 0 0 0.45rem;
   font-size: 1.2rem;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .post-body {

@@ -19,7 +19,13 @@ const handleLogin = async () => {
 
   try {
     const responsePayload = await api.post('/login', form.value, { auth: false });
-    setToken(responsePayload.data.token);
+    const token = responsePayload?.data?.token;
+
+    if (typeof token !== 'string' || !token) {
+      throw new Error('The server did not return a valid session token.');
+    }
+
+    setToken(token);
 
     const redirectPath = route.query.redirect;
     const destination = typeof redirectPath === 'string' && redirectPath.startsWith('/')
@@ -46,23 +52,25 @@ const handleLogin = async () => {
         <h1 class="login-subtitle">Sign-in</h1>
       </div>
       
-      <p class="error" v-if="error">{{ error }}</p>
+      <p v-if="error" id="login-error" class="error" role="alert">{{ error }}</p>
       
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <input type="email" v-model="form.email" placeholder="Your e-mail" required class="input-field" />
+          <label class="visually-hidden" for="login-email">Your e-mail</label>
+          <input id="login-email" v-model="form.email" type="email" autocomplete="email" placeholder="Your e-mail" required class="input-field" />
         </div>
         
         <div class="input-group">
-          <input type="password" v-model="form.password" placeholder="Your password" required class="input-field" />
-          <span class="password-help">Password recovery is not available yet.</span>
+          <label class="visually-hidden" for="login-password">Your password</label>
+          <input id="login-password" v-model="form.password" type="password" autocomplete="current-password" placeholder="Your password" required class="input-field" aria-describedby="login-password-help" />
+          <span id="login-password-help" class="password-help">Password recovery is not available yet.</span>
         </div>
         
         <button type="submit" class="btn" :disabled="loading">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
         
-        <router-link to="/register" class="btn register" style="text-decoration: none; display: block;">
+        <router-link to="/register" class="btn register">
           Create account
         </router-link>
       </form>
@@ -82,10 +90,10 @@ const handleLogin = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
-  padding: 1rem;
-  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 
 .login-box {
@@ -121,6 +129,7 @@ const handleLogin = async () => {
 }
 
 .input-field {
+  min-width: 0;
   width: 100%;
   padding: 1rem 1.5rem;
   border-radius: 1rem;
@@ -160,6 +169,7 @@ const handleLogin = async () => {
 }
 
 .register {
+  display: block;
   text-align: center;
   background-color: transparent;
   border: 1px solid rgba(111, 92, 255, 0.3);
@@ -176,5 +186,18 @@ const handleLogin = async () => {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+@media (max-width: 390px) {
+  .login-box {
+    padding: 2rem 1.25rem;
+    border-radius: 1.5rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .login-screen {
+    align-items: flex-start;
+  }
 }
 </style>

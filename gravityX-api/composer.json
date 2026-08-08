@@ -59,5 +59,8 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "require-dev": {
+        "darkaonline/l5-swagger": "^11.1"
+    }
 }

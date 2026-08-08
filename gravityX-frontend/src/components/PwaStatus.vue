@@ -85,7 +85,7 @@ onUnmounted(() => {
     </section>
 
     <section v-if="showOfflineReady" class="pwa-notice" role="status">
-      <span>O GravityX está pronto para abrir offline.</span>
+      <span>O GravityX pode abrir offline; conteúdo novo e alguns recursos visuais precisam de conexão.</span>
       <button type="button" class="pwa-notice__button" @click="isOfflineReadyDismissed = true">
         Entendi
       </button>
@@ -110,7 +110,7 @@ onUnmounted(() => {
 <style scoped>
 .pwa-notices {
   position: fixed;
-  z-index: 100;
+  z-index: 90;
   right: 1rem;
   bottom: calc(6.25rem + env(safe-area-inset-bottom));
   display: grid;
@@ -129,6 +129,10 @@ onUnmounted(() => {
   border: 1px solid rgba(111, 92, 255, 0.6);
   border-radius: 0.875rem;
   box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.28);
+}
+
+.pwa-notice > span {
+  min-width: 0;
 }
 
 .pwa-notice--warning {
@@ -154,6 +158,13 @@ onUnmounted(() => {
 @media (min-width: 1024px) {
   .pwa-notices {
     bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .pwa-notice {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

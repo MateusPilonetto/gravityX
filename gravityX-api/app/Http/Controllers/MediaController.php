@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\Story;
 use App\Models\User;
-use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class MediaController extends Controller
 {
@@ -23,6 +26,42 @@ class MediaController extends Controller
             $post->image_data,
             $post->image_mime_type,
             'public, max-age=31536000, immutable'
+        );
+    }
+
+    public function story(int $story): Response
+    {
+        $storyModel = Story::query()->findOrFail($story);
+
+        if ($storyModel->expires_at === null || $storyModel->expires_at->isPast()) {
+            abort(404);
+        }
+
+        if (! str_starts_with($storyModel->media_path, 'stories/')) {
+            abort(404);
+        }
+
+        $disk = Storage::disk($storyModel->mediaDisk());
+
+        if (! $disk->exists($storyModel->media_path)) {
+            abort(404);
+        }
+
+        $mimeType = $disk->mimeType($storyModel->media_path);
+
+        if (! in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'video/mp4'], true)) {
+            abort(404);
+        }
+
+        return new BinaryFileResponse(
+            $disk->path($storyModel->media_path),
+            200,
+            [
+                'Content-Type' => $mimeType,
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+            false
         );
     }
 

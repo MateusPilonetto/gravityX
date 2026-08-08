@@ -10,7 +10,7 @@ services:
       - "8000:8000"
     environment:
       APP_ENV: local
-      APP_DEBUG: "true"
+      APP_DEBUG: "false"
       APP_URL: http://localhost:8000
       FRONTEND_URL: http://localhost:8080
       DB_CONNECTION: sqlite
@@ -21,6 +21,7 @@ services:
     volumes:
       - sqlite_data:/var/db
       - storage_data:/var/www/storage/app/public
+      - private_story_data:/var/www/storage/app/private
       - app_state:/var/app-state
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://localhost:8000/up >/dev/null || exit 1"]
@@ -46,4 +47,5 @@ services:
 volumes:
   sqlite_data:
   storage_data:
+  private_story_data:
   app_state:

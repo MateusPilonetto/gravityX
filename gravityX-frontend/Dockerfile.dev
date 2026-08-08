@@ -1,0 +1,16 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY docker/entrypoint.dev.sh /usr/local/bin/gravityx-frontend-dev
+COPY . .
+
+RUN chmod +x /usr/local/bin/gravityx-frontend-dev
+
+EXPOSE 5173
+
+ENTRYPOINT ["/usr/local/bin/gravityx-frontend-dev"]
+CMD ["npm", "run", "dev", "--", "--host=0.0.0.0", "--port=5173", "--strictPort"]

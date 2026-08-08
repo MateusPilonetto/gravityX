@@ -11,12 +11,34 @@ function getArrayPayload(responsePayload, key) {
   return Array.isArray(value) ? value : [];
 }
 
-export async function fetchFeed() {
-  const responsePayload = await api.get('/posts');
+function getPaginationPayload(responsePayload, key = 'pagination') {
+  const pagination = responsePayload?.[key] ?? responsePayload?.data?.[key];
+
+  return pagination && typeof pagination === 'object'
+    ? pagination
+    : {
+      current_page: 1,
+      last_page: 1,
+      per_page: 0,
+      total: 0,
+      has_more_pages: false,
+    };
+}
+
+function withPage(path, page) {
+  const normalizedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const separator = path.includes('?') ? '&' : '?';
+
+  return `${path}${separator}page=${normalizedPage}`;
+}
+
+export async function fetchFeed({ page = 1 } = {}) {
+  const responsePayload = await api.get(withPage('/posts', page));
 
   return {
     posts: getArrayPayload(responsePayload, 'posts'),
     stories: getArrayPayload(responsePayload, 'stories'),
+    pagination: getPaginationPayload(responsePayload),
   };
 }
 
@@ -26,25 +48,48 @@ export async function fetchPosts() {
   return posts;
 }
 
-export async function fetchPostsByUsername(username) {
+export async function fetchPostsByUsername(username, { page = 1 } = {}) {
   const normalizedUsername = typeof username === 'string' ? username.trim() : '';
 
   if (!normalizedUsername) {
     throw new Error('A username is required to load profile posts.');
   }
 
-  const responsePayload = await api.get(`/users/${encodeURIComponent(normalizedUsername)}/posts`);
+  const responsePayload = await api.get(withPage(
+    `/users/${encodeURIComponent(normalizedUsername)}/posts`,
+    page,
+  ));
 
-  return getArrayPayload(responsePayload, 'posts');
+  return {
+    posts: getArrayPayload(responsePayload, 'posts'),
+    pagination: getPaginationPayload(responsePayload),
+  };
 }
 
 export async function fetchPost(postId) {
   const responsePayload = await api.get(`/posts/${encodeURIComponent(postId)}`);
   const post = getObjectPayload(responsePayload, 'post');
+  const commentsPagination = responsePayload?.comments_pagination
+    ?? responsePayload?.data?.comments_pagination;
 
   return {
     post,
-    comments: Array.isArray(post?.comments) ? post.comments : [],
+    comments: Array.isArray(post?.comments) ? post.comments : null,
+    commentsPagination: commentsPagination
+      ? getPaginationPayload(responsePayload, 'comments_pagination')
+      : null,
+  };
+}
+
+export async function fetchPostComments(postId, { page = 1 } = {}) {
+  const responsePayload = await api.get(withPage(
+    `/posts/${encodeURIComponent(postId)}/comments`,
+    page,
+  ));
+
+  return {
+    comments: getArrayPayload(responsePayload, 'comments'),
+    pagination: getPaginationPayload(responsePayload),
   };
 }
 

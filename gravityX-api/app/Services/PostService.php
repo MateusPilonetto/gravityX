@@ -5,44 +5,35 @@ namespace App\Services;
 use App\Models\Comment;
 use App\Models\Post;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class PostService
 {
-    /**
-     * @return Collection<int, Post>
-     */
-    public function listFor(User $viewer): Collection
+    public function paginateFor(User $viewer, int $perPage): LengthAwarePaginator
     {
         return $this->postQuery($viewer)
             ->latest()
-            ->get();
+            ->orderByDesc('posts.id')
+            ->paginate($perPage);
     }
 
-    /**
-     * @return Collection<int, Post>
-     */
-    public function listForUser(User $viewer, User $profileUser): Collection
+    public function paginateForUser(User $viewer, User $profileUser, int $perPage): LengthAwarePaginator
     {
         return $this->postQuery($viewer)
             ->where('user_id', $profileUser->id)
             ->latest()
-            ->get();
+            ->orderByDesc('posts.id')
+            ->paginate($perPage);
     }
 
     public function findFor(User $viewer, Post $post): Post
     {
         return $this->postQuery($viewer)
-            ->with([
-                'comments' => fn (HasMany $comments) => $comments
-                    ->with('user')
-                    ->oldest(),
-            ])
             ->findOrFail($post->id);
     }
 
@@ -79,15 +70,13 @@ class PostService
         return $this->findFor($user, $post);
     }
 
-    /**
-     * @return Collection<int, Comment>
-     */
-    public function commentsFor(Post $post): Collection
+    public function paginateCommentsFor(Post $post, int $perPage): LengthAwarePaginator
     {
         return $post->comments()
             ->with('user')
             ->oldest()
-            ->get();
+            ->orderBy('comments.id')
+            ->paginate($perPage);
     }
 
     /**
@@ -105,7 +94,11 @@ class PostService
 
     public function delete(Post $post): void
     {
+        $legacyImagePath = $post->image_path;
+
         $post->delete();
+
+        $this->deleteLegacyImage($legacyImagePath);
     }
 
     private function postQuery(User $viewer): Builder
@@ -167,6 +160,29 @@ class PostService
             'image_data' => $this->databaseBlob($data),
             'image_mime_type' => $mimeType,
         ];
+    }
+
+    private function deleteLegacyImage(?string $imagePath): void
+    {
+        if (! is_string($imagePath) || $imagePath === '') {
+            return;
+        }
+
+        $normalizedPath = ltrim($imagePath, '/');
+
+        if (str_starts_with($normalizedPath, 'storage/')) {
+            $normalizedPath = substr($normalizedPath, strlen('storage/'));
+        }
+
+        if (! str_starts_with($normalizedPath, 'posts/')) {
+            return;
+        }
+
+        try {
+            Storage::disk('public')->delete($normalizedPath);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**
