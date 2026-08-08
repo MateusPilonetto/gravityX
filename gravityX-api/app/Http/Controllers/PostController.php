@@ -10,6 +10,7 @@ use App\Http\Resources\StoryAuthorResource;
 use App\Models\Post;
 use App\Models\User;
 use App\Services\PostService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,9 +24,7 @@ class PostController extends Controller
     {
         $user = $request->user();
 
-        $posts = PostResource::collection(
-            $this->postService->listFor($user)
-        );
+        $posts = $this->postService->paginateFor($user, $this->perPage($request));
 
         $storyAuthorIds = $user->following()
             ->pluck('following_id')
@@ -42,8 +41,9 @@ class PostController extends Controller
 
         return response()->json([
             'message' => 'Feed recuperado com sucesso.',
-            'posts' => $posts,
-            'stories' => StoryAuthorResource::collection($usersWithStories),
+            'posts' => PostResource::collection($posts->getCollection())->resolve($request),
+            'pagination' => $this->paginationPayload($posts),
+            'stories' => StoryAuthorResource::collection($usersWithStories)->resolve($request),
         ]);
     }
 
@@ -52,12 +52,16 @@ class PostController extends Controller
         $profileUser = User::query()
             ->where('username', $username)
             ->firstOrFail();
+        $posts = $this->postService->paginateForUser(
+            $request->user(),
+            $profileUser,
+            $this->perPage($request)
+        );
 
         return response()->json([
             'message' => 'Profile posts retrieved successfully.',
-            'posts' => PostResource::collection(
-                $this->postService->listForUser($request->user(), $profileUser)
-            ),
+            'posts' => PostResource::collection($posts->getCollection())->resolve($request),
+            'pagination' => $this->paginationPayload($posts),
         ]);
     }
 
@@ -80,11 +84,14 @@ class PostController extends Controller
 
     public function show(Request $request, Post $post): JsonResponse
     {
+        $post = $this->postService->findFor($request->user(), $post);
+        $comments = $this->postService->paginateCommentsFor($post, $this->perPage($request));
+        $post->setRelation('comments', $comments->getCollection());
+
         return response()->json([
             'message' => 'Post retrieved successfully.',
-            'post' => new PostResource(
-                $this->postService->findFor($request->user(), $post)
-            ),
+            'post' => new PostResource($post),
+            'comments_pagination' => $this->paginationPayload($comments),
         ]);
     }
 
@@ -125,11 +132,12 @@ class PostController extends Controller
 
     public function comments(Request $request, Post $post): JsonResponse
     {
+        $comments = $this->postService->paginateCommentsFor($post, $this->perPage($request));
+
         return response()->json([
             'message' => 'Comments retrieved successfully.',
-            'comments' => CommentResource::collection(
-                $this->postService->commentsFor($post)
-            ),
+            'comments' => CommentResource::collection($comments->getCollection())->resolve($request),
+            'pagination' => $this->paginationPayload($comments),
         ]);
     }
 
@@ -151,5 +159,24 @@ class PostController extends Controller
     private function isPostAuthor(User $user, Post $post): bool
     {
         return $user->id === $post->user_id;
+    }
+
+    private function perPage(Request $request): int
+    {
+        return min(max((int) $request->query('per_page', 20), 1), 50);
+    }
+
+    /**
+     * @return array{current_page: int, last_page: int, per_page: int, total: int, has_more_pages: bool}
+     */
+    private function paginationPayload(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'has_more_pages' => $paginator->hasMorePages(),
+        ];
     }
 }

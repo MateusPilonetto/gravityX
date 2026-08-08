@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\URL;
 
 class StoryResource extends JsonResource
 {
@@ -17,7 +18,12 @@ class StoryResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
-            'media_url' => '/storage/'.ltrim($this->media_path, '/'),
+            'media_url' => URL::temporarySignedRoute(
+                'media.story',
+                $this->expires_at,
+                ['story' => $this->id],
+                false
+            ),
             'media_type' => $this->media_type,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,

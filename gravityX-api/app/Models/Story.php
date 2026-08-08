@@ -28,7 +28,12 @@ class Story extends Model
 
     protected function pruning(): void
     {
-        Storage::disk('public')->delete($this->media_path);
+        Storage::disk($this->mediaDisk())->delete($this->media_path);
+    }
+
+    public function mediaDisk(): string
+    {
+        return Storage::disk('local')->exists($this->media_path) ? 'local' : 'public';
     }
 
     public function user(): BelongsTo

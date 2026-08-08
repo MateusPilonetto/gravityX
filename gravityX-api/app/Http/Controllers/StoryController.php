@@ -21,7 +21,7 @@ class StoryController extends Controller
         $path = null;
 
         try {
-            $path = $media->store('stories', 'public');
+            $path = $media->store('stories', 'local');
 
             if (! is_string($path) || $path === '') {
                 throw new RuntimeException('Unable to store the story media.');
@@ -41,7 +41,7 @@ class StoryController extends Controller
             ], 201);
         } catch (Throwable $exception) {
             if (is_string($path) && $path !== '') {
-                Storage::disk('public')->delete($path);
+                Storage::disk('local')->delete($path);
             }
 
             report($exception);
@@ -61,11 +61,12 @@ class StoryController extends Controller
         }
 
         $mediaPath = $story->media_path;
+        $mediaDisk = $story->mediaDisk();
 
         $story->delete();
 
         try {
-            Storage::disk('public')->delete($mediaPath);
+            Storage::disk($mediaDisk)->delete($mediaPath);
         } catch (Throwable $exception) {
             report($exception);
         }

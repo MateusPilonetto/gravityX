@@ -23,6 +23,7 @@ const actionLabel = computed(() => (isAuthenticated() ? 'Go to Feed' : 'Go to Lo
 .not-found-page {
   display: grid;
   min-height: 100vh;
+  min-height: 100dvh;
   place-items: center;
   padding: 2rem;
   box-sizing: border-box;

@@ -1,4 +1,7 @@
 .codex
 .agents
 .dockerignore
+!/.dockerignore
+!gravityX-api/.dockerignore
+!gravityX-frontend/.dockerignore
 .gitignore

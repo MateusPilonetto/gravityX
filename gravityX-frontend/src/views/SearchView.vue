@@ -127,20 +127,21 @@ onMounted(() => {
 
 <template>
     <div class="search-page">
-        <div class="search-container">
+        <form class="search-container" @submit.prevent="searchUsers">
+            <label class="visually-hidden" for="searchInput">Search users</label>
             <input 
                 class="glass-effect search-input" 
                 type="search"  
                 id="searchInput"
                 v-model="searchQuery"
                 @input="resetSearchState"
-                @keyup.enter="searchUsers"
+                autocomplete="off"
                 placeholder="Search users..."
             >
-            <button @click="searchUsers" type="button" class="search-button glass-effect" aria-label="Search users">
+            <button type="submit" class="search-button glass-effect" aria-label="Search users">
                 <i class="fa-solid fa-search fa-xl" style="color: #FFC857;"></i>
             </button>
-        </div>
+        </form>
 
         <section v-if="showProfileSuggestions" class="suggestions-section" aria-labelledby="profile-suggestions-title">
             <div class="suggestions-heading">
@@ -162,11 +163,12 @@ onMounted(() => {
                 <button
                     v-for="user in profileSuggestions"
                     :key="user.id"
+                    type="button"
                     class="user-card glass-effect"
                     @click="goToProfile(user.username)"
                     :aria-label="`Open ${user.username}'s profile`"
                 >
-                    <img :src="getAvatarUrl(user)" class="card-avatar" alt="User avatar" @error="handleAvatarError($event, user)">
+                    <img :src="getAvatarUrl(user)" class="card-avatar" :alt="`${user.name || user.username}'s profile photo`" @error="handleAvatarError($event, user)">
                     <div class="card-info">
                         <h3 class="card-username">@{{ user.username }}</h3>
                         <p class="card-name">{{ user.name || 'GravityX User' }}</p>
@@ -196,11 +198,12 @@ onMounted(() => {
             <button
                 v-for="user in searchResults" 
                 :key="user.id" 
+                type="button"
                 class="user-card glass-effect"
                 @click="goToProfile(user.username)"
                 :aria-label="`Open ${user.username}'s profile`"
             >
-                <img :src="getAvatarUrl(user)" class="card-avatar" alt="User avatar" @error="handleAvatarError($event, user)">
+                <img :src="getAvatarUrl(user)" class="card-avatar" :alt="`${user.name || user.username}'s profile photo`" @error="handleAvatarError($event, user)">
                 <div class="card-info">
                     <h3 class="card-username">@{{ user.username }}</h3>
                     <p class="card-name">{{ user.name || 'GravityX User' }}</p>
@@ -217,7 +220,7 @@ onMounted(() => {
     align-items: center;
     width: 100%;
     min-height: 80vh;
-    padding: 2rem;
+    padding: 2rem 2rem calc(7.5rem + env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 
@@ -232,6 +235,7 @@ onMounted(() => {
 
 .search-input {
     flex: 1;
+    min-width: 0;
     padding: 1.2rem 1.5rem;
     border-radius: 1.5rem;
     border: 1px solid rgba(111, 92, 255, 0.3);
@@ -254,6 +258,7 @@ onMounted(() => {
     border-radius: 1.5rem;
     width: 4rem;
     height: 4rem;
+    flex: 0 0 auto;
     margin-left: 1rem;
     border: 1px solid rgba(111, 92, 255, 0.3);
     background: rgba(3, 2, 4, 0.6);
@@ -268,7 +273,7 @@ onMounted(() => {
 
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 1.5rem;
     width: 100%;
     max-width: 900px;
@@ -346,6 +351,7 @@ onMounted(() => {
 }
 
 .card-info {
+    min-width: 0;
     text-align: center;
 }
 
@@ -354,12 +360,14 @@ onMounted(() => {
     color: #fff;
     font-size: 1.1rem;
     font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 .card-name {
     margin: 5px 0 0 0;
     color: #a8a8a8;
     font-size: 0.9rem;
+    overflow-wrap: anywhere;
 }
 
 .suggestion-meta {
@@ -385,5 +393,28 @@ onMounted(() => {
     color: #ffb3b3;
     font-size: 1.1rem;
     margin: 0;
+}
+
+@media (max-width: 480px) {
+    .search-page {
+        padding: 1.25rem 1rem calc(7.5rem + env(safe-area-inset-bottom));
+    }
+
+    .search-container {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+    }
+
+    .search-button {
+        width: 100%;
+        height: 3.25rem;
+        margin-left: 0;
+    }
+
+    .results-grid {
+        gap: 1rem;
+    }
 }
 </style>
