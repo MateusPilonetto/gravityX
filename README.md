@@ -1,11 +1,11 @@
 # GravityX
 
-GravityX é uma aplicação social full-stack, com frontend em Vue e uma API REST em Laravel.
+GravityX is a full-stack social application with a Vue frontend and a Laravel REST API.
 
-## Estrutura
+## Project structure
 
-- `gravityX-frontend/`: aplicação Vue 3 + Vite.
-- `gravityX-api/`: API Laravel e migrations do banco.
+- `gravityX-frontend/`: Vue 3 + Vite application.
+- `gravityX-api/`: Laravel API and database migrations.
 
 ## Development environment (Docker)
 
@@ -59,24 +59,24 @@ To call protected endpoints from Swagger UI:
 2. Copy the `token` value from the response.
 3. Click **Authorize** in Swagger UI and paste the token. The UI adds the `Bearer` prefix automatically.
 
-## Iniciar com Docker (recomendado)
+## Run with Docker (recommended)
 
-Pré-requisito: Docker com o plugin Docker Compose instalado.
+Prerequisite: Docker with the Docker Compose plugin installed.
 
-Na raiz do repositório, execute:
+From the repository root, run:
 
 ```bash
 docker compose up -d --build
 ```
 
-O ambiente completo fica disponível em:
+The full environment is available at:
 
 - Frontend: `http://localhost:8080`
 - API: `http://localhost:8000`
 
-O Compose usa SQLite em um volume nomeado. Na primeira execução ele cria a chave da aplicação, o banco, aplica as migrations e cria o link de arquivos públicos automaticamente. Não é necessário criar arquivos `.env` para essa forma de uso.
+Compose uses SQLite in a named volume. On the first run, it creates the application key and database, applies migrations, and creates the public-files symlink automatically. No `.env` files are required for this setup.
 
-Comandos úteis:
+Useful commands:
 
 ```bash
 docker compose ps
@@ -84,17 +84,17 @@ docker compose logs -f
 docker compose down
 ```
 
-As portas `8000` e `8080` precisam estar livres. Para apagar também os dados locais do Docker e começar do zero, use o comando abaixo — ele é destrutivo para os dados locais do GravityX:
+Ports `8000` and `8080` must be available. To also remove the local Docker data and start from scratch, use the command below — it is destructive to local GravityX data:
 
 ```bash
 docker compose down -v
 ```
 
-## Iniciar sem Docker
+## Run without Docker
 
-Use dois terminais. O backend usa SQLite local e o frontend se conecta à API em `http://localhost:8000/api` por padrão.
+Use two terminals. The backend uses local SQLite, and the frontend connects to `http://localhost:8000/api` by default.
 
-No primeiro terminal:
+In the first terminal:
 
 ```bash
 cd gravityX-api
@@ -107,7 +107,7 @@ php artisan storage:link
 php artisan serve
 ```
 
-No segundo terminal:
+In the second terminal:
 
 ```bash
 cd gravityX-frontend
@@ -116,16 +116,16 @@ npm ci
 npm run dev
 ```
 
-O frontend de desenvolvimento ficará em `http://localhost:5173`.
+The development frontend will be available at `http://localhost:5173`.
 
-## Produção no Render
+## Production on Render
 
-O projeto mantém SQLite para o desenvolvimento local e aceita PostgreSQL em produção. Para a API, use o Dockerfile `gravityX-api/Dockerfile` com o contexto de build na raiz do repositório, pois ele copia arquivos a partir dela. Configure ao menos:
+The project uses SQLite for local development and supports PostgreSQL in production. For the API, use `gravityX-api/Dockerfile` with the repository root as the build context, because it copies files from that location. Configure at least:
 
-- `APP_ENV=production` e `APP_DEBUG=false`
-- `APP_KEY` (gere uma vez com `php artisan key:generate --show`)
-- `APP_URL` com a URL pública da API
-- `FRONTEND_URL` com a URL pública do frontend
-- `DB_CONNECTION=pgsql` e `DATABASE_URL` fornecida pelo PostgreSQL
+- `APP_ENV=production` and `APP_DEBUG=false`
+- `APP_KEY` (generate it once with `php artisan key:generate --show`)
+- `APP_URL` with the public API URL
+- `FRONTEND_URL` with the public frontend URL
+- `DB_CONNECTION=pgsql` and the PostgreSQL-provided `DATABASE_URL`
 
-Para o frontend, publique `gravityX-frontend` como site estático, com `npm ci && npm run build` e diretório de publicação `dist`. Defina `VITE_API_URL` durante o build como `https://<sua-api>/api`; sem essa variável, o frontend de produção tentará usar a API local.
+For the frontend, deploy `gravityX-frontend` as a static site with `npm ci && npm run build` and use `dist` as the publish directory. Set `VITE_API_URL` during the build to `https://<your-api>/api`; without it, the production frontend will attempt to use the local API.
