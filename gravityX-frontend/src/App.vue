@@ -82,9 +82,6 @@ watch(() => route.path, () => {
 const handleLogout = () => {
   const invalidateSession = api.post('/logout');
 
-  // Do not leave someone trapped in the authenticated UI when their
-  // connection is slow or unavailable. `api.post` captures the token before
-  // this clears it, so the server can still revoke the current session.
   redirectToLogin();
 
   void invalidateSession.catch((errorResponse) => {

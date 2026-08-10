@@ -19,13 +19,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-COPY gravityX-api/docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
-COPY gravityX-api/composer.json gravityX-api/composer.lock ./
+COPY composer.json composer.lock ./
 
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
-COPY gravityX-api/ .
+COPY . .
 
 RUN composer dump-autoload --optimize \
     && mkdir -p database \

@@ -3,8 +3,8 @@ name: gravityx
 services:
   api:
     build:
-      context: .
-      dockerfile: gravityX-api/Dockerfile
+      context: ./gravityX-api
+      dockerfile: Dockerfile
     command: ["sh", "/var/www/docker/entrypoint.local.sh"]
     ports:
       - "8000:8000"
